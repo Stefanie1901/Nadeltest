@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Admin · Nadeltest</title>
+<link rel="stylesheet" href="/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<style>
+  .hub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 32px;
+  }
+  .hub-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 20px;
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    cursor: pointer;
+  }
+  .hub-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(138, 110, 160, 0.15);
+    border-color: var(--lavender-soft);
+  }
+  .hub-tile__icon { font-size: 28px; color: var(--lavender-deep); margin-bottom: 4px; }
+  .hub-tile__title { font-family: var(--font-serif); font-size: 18px; font-weight: 500; color: var(--ink); margin: 0; }
+  .hub-tile__sub { font-family: var(--font-sans); font-size: 13px; color: var(--ink-soft); margin: 0; }
+
+  .quick-qr {
+    background: var(--paper);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 28px;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .quick-qr__layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 28px;
+    align-items: start;
+  }
+
+  @media (max-width: 720px) {
+    .quick-qr__layout { grid-template-columns: 1fr; }
+  }
+
+  .quick-qr__preview {
+    text-align: center;
+    padding: 24px;
+    background: linear-gradient(135deg, var(--lavender-whisper), var(--paper));
+    border-radius: var(--radius);
+    border: 1px dashed var(--lavender-soft);
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .quick-qr__preview canvas { display: block; }
+  .quick-qr__placeholder {
+    font-family: var(--font-script);
+    font-size: 28px;
+    color: var(--lavender-deep);
+    opacity: 0.6;
+  }
+  .quick-qr__caption {
+    font-family: var(--font-serif);
+    font-size: 14px;
+    color: var(--ink);
+    margin: 0;
+  }
+  .quick-qr__caption strong { color: var(--lavender-deep); }
+  .quick-qr__url {
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    word-break: break-all;
+    margin: 0;
+    padding: 0 8px;
+  }
+
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .action-row .btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--lavender-deep);
+    color: var(--paper);
+    padding: 12px 20px;
+    border-radius: 100px;
+    font-family: var(--font-serif);
+    font-size: 14px;
+    box-shadow: 0 8px 24px rgba(138, 110, 160, 0.4);
+    animation: toast-in 0.3s ease-out;
+    z-index: 1000;
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translate(-50%, 20px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+  }
+</style>
+</head>
+<body>
+<main class="page page--wide">
+
+  <header class="header fade-in">
+    <p class="header__brand">Bad Mergentheim Knitting</p>
+    <h1 class="header__title">Admin</h1>
+    <p class="header__subtitle">Nadeltest · Schaltzentrale</p>
+    <div class="divider"><span class="heart">♡</span></div>
+  </header>
+
+  <!-- Passwort-Gate -->
+  <div id="loginCard" class="card login-card" hidden style="max-width: 400px; margin: 60px auto;">
+    <h2 class="section__title">Admin-Zugang</h2>
+    <p class="section__sub">Bitte das Admin-Passwort eingeben.</p>
+    <div class="field"><input type="password" id="pwInput" placeholder="Passwort" autocomplete="current-password" /></div>
+    <button type="button" class="btn btn--block" id="loginBtn">Anmelden</button>
+    <div id="loginError" style="margin-top: 14px;"></div>
+  </div>
+
+  <div id="content" hidden>
+
+    <!-- Hub-Tiles -->
+    <section class="section fade-in">
+      <div class="hub-grid">
+        <a class="hub-tile" href="/setup">
+          <span class="hub-tile__icon">📅</span>
+          <h3 class="hub-tile__title">Stricktreff vorbereiten</h3>
+          <p class="hub-tile__sub">Alle Stationen anlegen, QR-Bogen drucken</p>
+        </a>
+        <a class="hub-tile" href="/dashboard">
+          <span class="hub-tile__icon">📊</span>
+          <h3 class="hub-tile__title">Auswertung</h3>
+          <p class="hub-tile__sub">Live-Dashboard mit allen Antworten</p>
+        </a>
+        <a class="hub-tile" href="/report">
+          <span class="hub-tile__icon">📄</span>
+          <h3 class="hub-tile__title">PDF-Bericht</h3>
+          <p class="hub-tile__sub">Drucken oder als PDF speichern</p>
+        </a>
+        <a class="hub-tile" href="https://www.notion.so/36067af5325081b78a18fcde7c73d44b" target="_blank" rel="noopener">
+          <span class="hub-tile__icon">🪡</span>
+          <h3 class="hub-tile__title">Nadeln &amp; Garne pflegen</h3>
+          <p class="hub-tile__sub">In Notion öffnen</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- Schnell-QR -->
+    <section class="section fade-in">
+      <h2 class="section__title">Spontane Station</h2>
+      <p class="section__sub">Anna hat ein Muster mitgebracht? Hier in 10 Sekunden einen neuen QR + Link erzeugen.</p>
+
+      <div class="quick-qr">
+        <div class="quick-qr__layout">
+
+          <!-- Eingaben -->
+          <div>
+            <div class="field">
+              <label class="field__label" for="qStation">Stationsnummer</label>
+              <input type="number" id="qStation" min="1" max="99" placeholder="z. B. 5" />
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="qGarn">Garn</label>
+              <select id="qGarn">
+                <option value="">Bitte Garn wählen…</option>
+              </select>
+              <p class="field__sub" style="margin: 8px 0 0;">
+                Garn nicht in der Liste? <a href="https://www.notion.so/74ce5531470b4f1e818ade7c7013b32b" target="_blank" rel="noopener" style="color: var(--lavender-deep);">In Notion ergänzen</a> und Aktiv anhaken.
+              </p>
+            </div>
+
+            <div class="field" style="margin-bottom: 0;">
+              <label class="field__label" for="qDatum">Stricktreff-Datum</label>
+              <input type="date" id="qDatum" />
+            </div>
+          </div>
+
+          <!-- QR-Preview -->
+          <div>
+            <div class="quick-qr__preview" id="preview">
+              <div class="quick-qr__placeholder" id="placeholder">
+                wartet auf dich …
+              </div>
+              <canvas id="qrCanvas" hidden></canvas>
+              <p class="quick-qr__caption" id="caption" hidden></p>
+            </div>
+
+            <div class="action-row" id="actions" hidden>
+              <button type="button" class="btn" id="shareBtn">📲 In WhatsApp teilen</button>
+              <button type="button" class="btn btn--ghost" id="copyBtn">🔗 Link kopieren</button>
+              <button type="button" class="btn btn--ghost" id="printOneBtn">🖨️ Diesen QR drucken</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <footer class="footer">
+    Bad Mergentheim Knitting <span class="footer__heart">♡</span> Stricktreff
+  </footer>
+</main>
+
+<!-- Print-only Layout für einzelnen QR -->
+<div id="printSheet" hidden></div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let adminPw = sessionStorage.getItem("ndt_pw") || "";
+  let garne = [];
+
+  // -------- Passwort-Gate --------
+  // Wir testen den Zugang, indem wir /api/results aufrufen (das schon passwortgeschützt ist).
+  // Wenn kein Passwort gesetzt ist, geht alles durch.
+
+  async function checkAccess() {
+    const headers = {};
+    if (adminPw) headers["X-Admin-Password"] = adminPw;
+    const res = await fetch("/api/results", { headers });
+    if (res.status === 401) return false;
+    if (!res.ok) return null;
+    return true;
+  }
+
+  $("loginBtn").addEventListener("click", async () => {
+    adminPw = $("pwInput").value;
+    sessionStorage.setItem("ndt_pw", adminPw);
+    $("loginError").innerHTML = "";
+    const ok = await checkAccess();
+    if (ok) {
+      $("loginCard").hidden = true;
+      $("content").hidden = false;
+      loadGarne();
+    } else {
+      $("loginError").innerHTML = '<div class="banner banner--error">Passwort falsch.</div>';
+    }
+  });
+
+  // -------- Garne laden --------
+
+  async function loadGarne() {
+    try {
+      const res = await fetch("/api/options");
+      if (!res.ok) throw new Error("Konnte Garne nicht laden.");
+      const data = await res.json();
+      garne = data.garne || [];
+      const sel = $("qGarn");
+      garne.forEach((g) => {
+        const opt = document.createElement("option");
+        const label = g.hersteller ? g.hersteller + " — " + g.name : g.name;
+        opt.value = g.name;
+        opt.textContent = label;
+        sel.appendChild(opt);
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // -------- Live-QR --------
+
+  function buildUrl() {
+    const station = $("qStation").value.trim();
+    const garn = $("qGarn").value;
+    const datum = $("qDatum").value;
+    if (!station || !garn || !datum) return null;
+    return location.origin + "/?station=" + encodeURIComponent(station) +
+           "&garn=" + encodeURIComponent(garn) +
+           "&datum=" + encodeURIComponent(datum);
+  }
+
+  async function updatePreview() {
+    const url = buildUrl();
+    const canvas = $("qrCanvas");
+    const placeholder = $("placeholder");
+    const caption = $("caption");
+    const actions = $("actions");
+    const urlField = $("qrUrl");
+
+    if (!url) {
+      canvas.hidden = true;
+      caption.hidden = true;
+      actions.hidden = true;
+      placeholder.hidden = false;
+      return;
+    }
+
+    await window.QRCode.toCanvas(canvas, url, {
+      width: 220,
+      margin: 1,
+      color: { dark: "#3a3340", light: "#ffffff" },
+      errorCorrectionLevel: "M",
+    });
+    canvas.hidden = false;
+    placeholder.hidden = true;
+
+    const station = $("qStation").value;
+    const garn = $("qGarn").value;
+    caption.innerHTML = "<strong>Station " + station + "</strong><br>" + escapeHtml(garn);
+    caption.hidden = false;
+    actions.hidden = false;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  ["qStation", "qGarn", "qDatum"].forEach((id) => {
+    $(id).addEventListener("input", updatePreview);
+    $(id).addEventListener("change", updatePreview);
+  });
+
+  // -------- Aktionen --------
+
+  function toast(msg) {
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2200);
+  }
+
+  function buildShareText() {
+    const station = $("qStation").value;
+    const garn = $("qGarn").value;
+    const datum = $("qDatum").value;
+    const dateStr = datum ? new Date(datum).toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long" }) : "";
+    return "🪡 Nadeltest – Station " + station + "\n" +
+           "Garn: " + garn + "\n" +
+           (dateStr ? "Stricktreff am " + dateStr + "\n" : "") + "\n" +
+           "Bitte am Korb scannen oder Link öffnen:";
+  }
+
+  $("shareBtn").addEventListener("click", async () => {
+    const url = buildUrl();
+    if (!url) return toast("Bitte erst Station, Garn und Datum wählen.");
+    const text = buildShareText();
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Nadeltest – Station " + $("qStation").value,
+          text: text,
+          url: url,
+        });
+      } catch (e) {
+        if (e.name !== "AbortError") toast("Teilen fehlgeschlagen — Link wurde stattdessen kopiert.");
+        else return;
+        await copyToClipboard(text + "\n" + url);
+      }
+    } else {
+      // Fallback: WhatsApp-Web-URL direkt
+      const waUrl = "https://wa.me/?text=" + encodeURIComponent(text + "\n" + url);
+      window.open(waUrl, "_blank", "noopener,noreferrer");
+    }
+  });
+
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("Link kopiert.");
+    } catch (e) {
+      // Fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); toast("Link kopiert."); } catch {}
+      ta.remove();
+    }
+  }
+
+  $("copyBtn").addEventListener("click", () => {
+    const url = buildUrl();
+    if (!url) return toast("Bitte erst Station, Garn und Datum wählen.");
+    copyToClipboard(url);
+  });
+
+  $("printOneBtn").addEventListener("click", () => {
+    const url = buildUrl();
+    if (!url) return toast("Bitte erst Station, Garn und Datum wählen.");
+
+    const station = $("qStation").value;
+    const garn = $("qGarn").value;
+    const canvas = $("qrCanvas");
+    const dataUrl = canvas.toDataURL("image/png");
+
+    const w = window.open("", "_blank");
+    if (!w) return toast("Pop-up wurde blockiert — bitte erlauben.");
+
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>QR Station ${station}</title>
+<link rel="stylesheet" href="${location.origin}/styles.css">
+<style>
+  @page { size: A5; margin: 12mm; }
+  body { background: white; padding: 20mm 12mm; text-align: center; font-family: var(--font-sans); }
+  body::before { display: none; }
+  .qr-print-card { padding: 30px; border: 1px solid var(--border); border-radius: 16px; max-width: 360px; margin: 0 auto; background: white; }
+  .qr-print-card h1 { font-family: var(--font-serif); font-size: 28px; color: var(--lavender-deep); margin: 0 0 4px; font-weight: 500; }
+  .qr-print-card h2 { font-family: var(--font-script); font-size: 36px; color: var(--lavender-deep); margin: 8px 0 16px; }
+  .qr-print-card .garn { font-family: var(--font-serif); font-size: 18px; color: var(--ink); margin-bottom: 20px; }
+  .qr-print-card img { width: 260px; height: 260px; }
+  .qr-print-card .tip { font-family: var(--font-sans); font-size: 13px; color: var(--ink-soft); margin-top: 20px; }
+  .qr-print-card .brand { font-family: var(--font-serif); font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink-soft); margin: 24px 0 0; }
+  .heart { color: var(--heart); }
+</style></head><body>
+<div class="qr-print-card">
+  <div class="brand">Bad Mergentheim Knitting</div>
+  <h2>Nadeltest</h2>
+  <h1>Station ${escapeHtml(station)}</h1>
+  <div class="garn">${escapeHtml(garn)}</div>
+  <img src="${dataUrl}" alt="QR-Code">
+  <p class="tip">Scanne den Code mit deiner Kamera.<br>Bewerte 2–3 Nadeln am Korb. <span class="heart">♡</span></p>
+</div>
+<script>window.onload = function() { setTimeout(function() { window.print(); }, 300); };<\/script>
+</body></html>`);
+    w.document.close();
+  });
+
+  // -------- Init --------
+
+  $("qDatum").valueAsDate = new Date();
+
+  // Check Auth
+  (async () => {
+    const ok = await checkAccess();
+    if (ok === true || ok === null) {
+      // null = entweder Server-Fehler oder kein Passwort gesetzt — wir lassen rein
+      $("loginCard").hidden = true;
+      $("content").hidden = false;
+      loadGarne();
+    } else {
+      $("loginCard").hidden = false;
+      $("content").hidden = true;
+    }
+  })();
+})();
+</script>
+</body>
+</html>

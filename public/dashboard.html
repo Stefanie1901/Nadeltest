@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Auswertung · Nadeltest</title>
+<link rel="stylesheet" href="/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="/analytics.js"></script>
+<style>
+  .empty-state { text-align: center; padding: 64px 20px; color: var(--ink-soft); }
+  .empty-state__title { font-family: var(--font-script); font-size: 48px; color: var(--lavender-deep); margin: 0 0 8px; }
+  .login-card { max-width: 400px; margin: 80px auto; }
+  .pill { display: inline-block; padding: 4px 10px; border-radius: 100px; background: var(--lavender-whisper); color: var(--lavender-deep); font-size: 12px; font-family: var(--font-serif); letter-spacing: 0.04em; margin-right: 4px; }
+
+  .heatmap-wrap { overflow-x: auto; margin: -8px; padding: 8px; }
+  .heatmap { border-collapse: separate; border-spacing: 4px; font-size: 13px; }
+  .heatmap th, .heatmap td { padding: 8px 10px; border-radius: 8px; text-align: center; background: var(--cream); border: none; min-width: 60px; }
+  .heatmap th { font-family: var(--font-serif); font-weight: 500; background: var(--lavender-whisper); color: var(--lavender-deep); text-transform: none; letter-spacing: 0; font-size: 13px; }
+  .heatmap td.cell { color: var(--ink); font-family: var(--font-serif); font-weight: 500; font-size: 16px; }
+
+  .quote { padding: 14px 16px; background: var(--cream); border-left: 3px solid var(--lavender-soft); border-radius: 8px; margin-bottom: 10px; font-family: var(--font-serif); font-size: 15px; line-height: 1.5; color: var(--ink); }
+  .quote__meta { font-family: var(--font-sans); font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+
+  .pairing-list { display: flex; flex-direction: column; gap: 10px; }
+  .pairing { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--cream); border-radius: 12px; border: 1px solid var(--border); }
+  .pairing__rank { font-family: var(--font-script); font-size: 28px; color: var(--lavender-deep); width: 30px; text-align: center; line-height: 1; }
+  .pairing__pair { flex: 1; }
+  .pairing__nadel { font-family: var(--font-serif); font-size: 16px; font-weight: 500; }
+  .pairing__garn { font-family: var(--font-sans); font-size: 13px; color: var(--ink-soft); }
+  .pairing__score { font-family: var(--font-serif); font-size: 22px; font-weight: 500; color: var(--lavender-deep); }
+  .pairing__n { font-size: 11px; color: var(--ink-whisper); display: block; text-align: right; }
+
+  .filter-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .filter-row > div { flex: 1; min-width: 160px; }
+
+  .export-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border); }
+
+  .insight { padding: 14px 16px; background: linear-gradient(135deg, var(--lavender-whisper), var(--paper)); border-radius: 12px; font-family: var(--font-serif); font-size: 15px; color: var(--ink); margin-bottom: 16px; border-left: 3px solid var(--lavender); }
+</style>
+</head>
+<body>
+<main class="page page--wide">
+
+  <header class="header fade-in">
+    <p class="header__brand">Bad Mergentheim Knitting</p>
+    <h1 class="header__title">Auswertung</h1>
+    <p class="header__subtitle">Nadeltest · Stricktreff</p>
+    <div class="divider"><span class="heart">♡</span></div>
+  </header>
+
+  <!-- Login -->
+  <div id="loginCard" class="card login-card" hidden>
+    <h2 class="section__title">Admin-Zugang</h2>
+    <p class="section__sub">Bitte das Admin-Passwort eingeben.</p>
+    <div class="field"><input type="password" id="pwInput" placeholder="Passwort" /></div>
+    <button type="button" class="btn btn--block" id="loginBtn">Anmelden</button>
+    <div id="loginError" style="margin-top: 14px;"></div>
+  </div>
+
+  <div id="content" hidden>
+    <div id="status"></div>
+
+    <!-- Filter -->
+    <div class="filters fade-in" style="flex-direction: column; align-items: stretch;">
+      <div class="filter-row">
+        <div>
+          <label class="card__label" for="fTreff">Stricktreff</label>
+          <select id="fTreff"><option value="">Alle</option></select>
+        </div>
+        <div>
+          <label class="card__label" for="fNadel">Nadel</label>
+          <select id="fNadel"><option value="">Alle</option></select>
+        </div>
+        <div>
+          <label class="card__label" for="fGarn">Garn</label>
+          <select id="fGarn"><option value="">Alle</option></select>
+        </div>
+        <div>
+          <label class="card__label" for="fErfasserin">Erfasserin</label>
+          <select id="fErfasserin"><option value="">Alle</option></select>
+        </div>
+        <div>
+          <label class="card__label" for="fMaterial">Material</label>
+          <select id="fMaterial"><option value="">Alle</option></select>
+        </div>
+        <div>
+          <label class="card__label" for="fFaserart">Faserart</label>
+          <select id="fFaserart"><option value="">Alle</option></select>
+        </div>
+      </div>
+      <div class="export-bar">
+        <button type="button" class="btn btn--ghost" id="resetFilter">Filter zurücksetzen</button>
+        <button type="button" class="btn" id="reportBtn">PDF-Bericht erstellen</button>
+        <button type="button" class="btn btn--ghost" id="csvBtn">CSV exportieren</button>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid fade-in" id="kpis"></div>
+
+    <!-- Insights -->
+    <section class="section fade-in" id="insightsSection" hidden>
+      <h2 class="section__title">Auf einen Blick</h2>
+      <div id="insights"></div>
+    </section>
+
+    <!-- Top-Listen -->
+    <section class="section fade-in">
+      <h2 class="section__title">Lieblings-Nadeln &amp; Garne</h2>
+      <p class="section__sub">Durchschnitt aus Handgefühl, Maschenbild und Match</p>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3 class="chart-card__title">Top Nadeln</h3>
+          <p class="chart-card__sub">nach Gesamtschnitt (1–5)</p>
+          <div class="chart-card__canvas"><canvas id="cTopNadeln"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-card__title">Top Garne</h3>
+          <p class="chart-card__sub">nach Gesamtschnitt (1–5)</p>
+          <div class="chart-card__canvas"><canvas id="cTopGarne"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pairings -->
+    <section class="section fade-in">
+      <h2 class="section__title">Beste &amp; schlechteste Pairings</h2>
+      <p class="section__sub">Welche Garn-Nadel-Kombinationen funktionieren am besten?</p>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3 class="chart-card__title">Top 5 Pairings</h3>
+          <p class="chart-card__sub">höchster Gesamtschnitt</p>
+          <div class="pairing-list" id="topPairings"></div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-card__title">Diese passen weniger</h3>
+          <p class="chart-card__sub">niedrigster Gesamtschnitt</p>
+          <div class="pairing-list" id="lowPairings"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Detail-Aufschlüsselungen -->
+    <section class="section fade-in">
+      <h2 class="section__title">Im Detail</h2>
+      <p class="section__sub">Die drei Bewertungsdimensionen, aufgeschlüsselt</p>
+      <div class="chart-card">
+        <h3 class="chart-card__title">Pro Nadel</h3>
+        <div class="chart-card__canvas" style="height: 360px;"><canvas id="cNadelDetail"></canvas></div>
+      </div>
+      <div style="height: 20px;"></div>
+      <div class="chart-card">
+        <h3 class="chart-card__title">Pro Garn</h3>
+        <div class="chart-card__canvas" style="height: 360px;"><canvas id="cGarnDetail"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Material & Faserart -->
+    <section class="section fade-in">
+      <h2 class="section__title">Material &amp; Faserart</h2>
+      <p class="section__sub">Aggregierte Sicht: über alle Nadeln eines Materials und alle Garne einer Faserart</p>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3 class="chart-card__title">Pro Nadel-Material</h3>
+          <p class="chart-card__sub">Holz, Bambus, Karbon, Metall, …</p>
+          <div class="chart-card__canvas"><canvas id="cMaterial"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-card__title">Pro Garn-Faserart</h3>
+          <p class="chart-card__sub">Merino, Baumwolle, Alpaka, …</p>
+          <div class="chart-card__canvas"><canvas id="cFaserart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Heatmap -->
+    <section class="section fade-in">
+      <h2 class="section__title">Match-Matrix</h2>
+      <p class="section__sub">Mittelwert „passt zusammen" pro Garn × Nadel (1–5). Leer = nicht getestet.</p>
+      <div class="chart-card">
+        <div class="heatmap-wrap"><div id="heatmap"></div></div>
+      </div>
+    </section>
+
+    <!-- Konsens -->
+    <section class="section fade-in">
+      <h2 class="section__title">Konsens-Check</h2>
+      <p class="section__sub">Polarisiert eine Nadel (hohe Streuung) oder sind sich alle einig? Niedrige Streuung = großer Konsens.</p>
+      <div class="chart-card">
+        <div class="chart-card__canvas"><canvas id="cKonsens"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Korrelation -->
+    <section class="section fade-in">
+      <h2 class="section__title">Hängt das Maschenbild am Handgefühl?</h2>
+      <p class="section__sub">Pearson-Korrelation der beiden Dimensionen</p>
+      <div class="chart-card">
+        <p id="korrelationText" style="font-family: var(--font-serif); font-size: 18px; color: var(--lavender-deep); margin: 0 0 12px;"></p>
+        <div class="chart-card__canvas"><canvas id="cKorrelation"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Verteilung -->
+    <section class="section fade-in">
+      <h2 class="section__title">Verteilung der Bewertungen</h2>
+      <p class="section__sub">Wie oft wurde welcher Wert vergeben?</p>
+      <div class="chart-card">
+        <div class="chart-card__canvas"><canvas id="cVerteilung"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Reihenfolge -->
+    <section class="section fade-in">
+      <h2 class="section__title">Reihenfolge-Effekt</h2>
+      <p class="section__sub">Verändert sich die Bewertung je nach Position?</p>
+      <div class="chart-card">
+        <div class="chart-card__canvas"><canvas id="cReihenfolge"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Erfasserinnen -->
+    <section class="section fade-in" id="erfasserinnenSection">
+      <h2 class="section__title">Erfasserinnen</h2>
+      <p class="section__sub">Wer hat wie oft bewertet — und wie streng/großzügig?</p>
+      <div class="chart-card">
+        <div class="chart-card__canvas" style="height: 320px;"><canvas id="cErfasserinnen"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Treffe -->
+    <section class="section fade-in">
+      <h2 class="section__title">Antworten pro Stricktreff</h2>
+      <div class="chart-card">
+        <div class="chart-card__canvas"><canvas id="cTreff"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Stimmen -->
+    <section class="section fade-in">
+      <h2 class="section__title">Stimmen</h2>
+      <p class="section__sub">Bemerkungen aus dem Stricktreff</p>
+      <div id="quotes"></div>
+    </section>
+
+    <!-- Tabelle -->
+    <section class="section fade-in">
+      <h2 class="section__title">Alle Bewertungen</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Station</th>
+              <th>Nadel</th>
+              <th>Garn</th>
+              <th>Erfasserin</th>
+              <th>Hand</th>
+              <th>Bild</th>
+              <th>Match</th>
+              <th>Reihenf.</th>
+              <th>Bemerkung</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="emptyState" class="empty-state" hidden>
+    <h2 class="empty-state__title">Noch keine Antworten</h2>
+    <p>Sobald die erste Bewertung eingegangen ist, erscheint hier die Auswertung.</p>
+  </div>
+
+  <footer class="footer">
+    Bad Mergentheim Knitting <span class="footer__heart">♡</span> Stricktreff
+  </footer>
+</main>
+
+<script>
+(function () {
+  const A = window.Analytics;
+
+  const LAV_DEEP = "#8a6ea0", LAV = "#b8a1c7", LAV_SOFT = "#d8c5e1", LAV_MIST = "#ece2f1";
+  const HEART = "#d89bb8", INK = "#3a3340", INK_SOFT = "#6e6478";
+  const PALETTE = [LAV_DEEP, LAV, HEART, "#a094b5", "#c2a8d4", "#e6b8cf", "#7d6a8e", "#9b86b0"];
+
+  Chart.defaults.font.family = "Outfit, sans-serif";
+  Chart.defaults.color = INK_SOFT;
+  Chart.defaults.borderColor = "rgba(184, 161, 199, 0.15)";
+  Chart.register(window.ChartDataLabels);
+  Chart.defaults.plugins.datalabels = { display: false };
+
+  const charts = {};
+  let raw = [];          // angereicherte Records
+  let nadelnMeta = [];
+  let garneMeta = [];
+  let filtered = [];
+  let adminPw = sessionStorage.getItem("ndt_pw") || "";
+
+  const $ = (id) => document.getElementById(id);
+
+  function showStatus(msg, type) {
+    $("status").innerHTML = '<div class="banner banner--' + (type || "info") + '">' + A.escapeHtml(msg) + '</div>';
+  }
+
+  async function fetchData() {
+    const headers = {};
+    if (adminPw) headers["X-Admin-Password"] = adminPw;
+    const res = await fetch("/api/results", { headers });
+    if (res.status === 401) {
+      $("loginCard").hidden = false;
+      $("content").hidden = true;
+      throw new Error("auth");
+    }
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Konnte Daten nicht laden");
+    return res.json();
+  }
+
+  $("loginBtn").addEventListener("click", async () => {
+    adminPw = $("pwInput").value;
+    sessionStorage.setItem("ndt_pw", adminPw);
+    $("loginError").innerHTML = "";
+    try { await load(); } catch (e) {
+      if (e.message === "auth") $("loginError").innerHTML = '<div class="banner banner--error">Passwort falsch.</div>';
+    }
+  });
+
+  // --------- Filter ---------
+
+  function readFilters() {
+    return {
+      treff: $("fTreff").value,
+      nadel: $("fNadel").value,
+      garn: $("fGarn").value,
+      erfasserin: $("fErfasserin").value,
+      material: $("fMaterial").value,
+      faserart: $("fFaserart").value,
+    };
+  }
+
+  function applyFilters() {
+    const f = readFilters();
+    filtered = raw.filter((r) => {
+      if (f.treff && r.stricktreffDatum !== f.treff) return false;
+      if (f.nadel && r.nadel !== f.nadel) return false;
+      if (f.garn && r.garn !== f.garn) return false;
+      if (f.erfasserin === "__ANON__") { if (r.erfasserin && r.erfasserin.trim()) return false; }
+      else if (f.erfasserin && r.erfasserin !== f.erfasserin) return false;
+      if (f.material && r.nadelMaterial !== f.material) return false;
+      if (f.faserart && !(r.garnFaserart || []).includes(f.faserart)) return false;
+      return true;
+    });
+    render();
+  }
+
+  function populateFilters() {
+    // Treffe
+    const tSel = $("fTreff");
+    A.uniqueSorted(raw, "stricktreffDatum").forEach((d) => {
+      const o = document.createElement("option");
+      o.value = d; o.textContent = A.formatDate(d, { weekday: "short", day: "2-digit", month: "long", year: "numeric" });
+      tSel.appendChild(o);
+    });
+    // Nadeln
+    const nSel = $("fNadel");
+    A.uniqueSorted(raw, "nadel").forEach((v) => { const o = document.createElement("option"); o.value = v; o.textContent = v; nSel.appendChild(o); });
+    // Garne
+    const gSel = $("fGarn");
+    A.uniqueSorted(raw, "garn").forEach((v) => { const o = document.createElement("option"); o.value = v; o.textContent = v; gSel.appendChild(o); });
+    // Erfasserinnen
+    const eSel = $("fErfasserin");
+    const erf = A.uniqueSorted(raw.filter((r) => r.erfasserin && r.erfasserin.trim()), "erfasserin");
+    erf.forEach((v) => { const o = document.createElement("option"); o.value = v; o.textContent = v; eSel.appendChild(o); });
+    const anonCount = raw.filter((r) => !r.erfasserin || !r.erfasserin.trim()).length;
+    if (anonCount > 0) {
+      const o = document.createElement("option"); o.value = "__ANON__"; o.textContent = "(Anonym, " + anonCount + ")"; eSel.appendChild(o);
+    }
+    // Materialien
+    const mSel = $("fMaterial");
+    A.uniqueSorted(raw.filter((r) => r.nadelMaterial), "nadelMaterial").forEach((v) => { const o = document.createElement("option"); o.value = v; o.textContent = v; mSel.appendChild(o); });
+    // Faserarten
+    const fSel = $("fFaserart");
+    const allFasern = new Set();
+    raw.forEach((r) => (r.garnFaserart || []).forEach((f) => allFasern.add(f)));
+    Array.from(allFasern).sort((a, b) => a.localeCompare(b, "de")).forEach((v) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = v; fSel.appendChild(o);
+    });
+
+    [tSel, nSel, gSel, eSel, mSel, fSel].forEach((s) => s.addEventListener("change", applyFilters));
+    $("resetFilter").addEventListener("click", () => {
+      [tSel, nSel, gSel, eSel, mSel, fSel].forEach((s) => (s.value = ""));
+      applyFilters();
+    });
+  }
+
+  // --------- Chart-Helpers ---------
+
+  function destroy(id) { if (charts[id]) { charts[id].destroy(); charts[id] = null; } }
+
+  function horizontalBar(canvasId, labels, values, label) {
+    destroy(canvasId);
+    if (labels.length === 0) { labels = ["—"]; values = [0]; }
+    charts[canvasId] = new Chart($(canvasId).getContext("2d"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          label, data: values,
+          backgroundColor: labels.map((_, i) => PALETTE[i % PALETTE.length] + "cc"),
+          borderColor: labels.map((_, i) => PALETTE[i % PALETTE.length]),
+          borderWidth: 1.5, borderRadius: 6,
+        }],
+      },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: INK, padding: 10 },
+          datalabels: { display: true, anchor: "end", align: "end", color: INK, font: { family: "Cormorant Garamond", weight: 500, size: 13 }, formatter: (v) => Number.isFinite(v) ? v.toFixed(2) : "" },
+        },
+        scales: {
+          x: { min: 0, max: 5, grid: { color: "rgba(184,161,199,0.12)" }, ticks: { stepSize: 1 } },
+          y: { grid: { display: false }, ticks: { font: { family: "Outfit", size: 13 } } },
+        },
+      },
+    });
+  }
+
+  function groupedBars(canvasId, labels, datasets, opts) {
+    destroy(canvasId);
+    const o = opts || {};
+    charts[canvasId] = new Chart($(canvasId).getContext("2d"), {
+      type: "bar",
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { font: { family: "Outfit", size: 12 }, usePointStyle: true } },
+          tooltip: { backgroundColor: INK },
+        },
+        scales: {
+          y: { min: 0, max: o.yMax || 5, grid: { color: "rgba(184,161,199,0.12)" }, beginAtZero: true },
+          x: { grid: { display: false }, ticks: { font: { family: "Outfit", size: 11 }, maxRotation: 40, minRotation: 30 } },
+        },
+      },
+    });
+  }
+
+  // --------- Renderer ---------
+
+  function renderKPIs() {
+    const s = A.summary(filtered);
+    const kpis = [
+      { label: "Antworten", value: s.total },
+      { label: "Stricktreffs", value: s.treffe },
+      { label: "Nadeln", value: s.nadeln },
+      { label: "Garne", value: s.garne },
+      { label: "Erfasserinnen", value: s.erfasserinnen },
+      { label: "Gesamt-Ø", value: A.num(s.gesamtschnitt), unit: "/ 5" },
+    ];
+    $("kpis").innerHTML = kpis.map((k) =>
+      '<div class="kpi"><div class="kpi__accent"></div>' +
+      '<p class="kpi__label">' + A.escapeHtml(k.label) + '</p>' +
+      '<p class="kpi__value">' + A.escapeHtml(String(k.value)) + (k.unit ? '<span class="kpi__unit">' + A.escapeHtml(k.unit) + '</span>' : '') + '</p>' +
+      '</div>'
+    ).join("");
+  }
+
+  function renderInsights() {
+    const insights = [];
+    const s = A.summary(filtered);
+    if (s.total < 5) {
+      $("insightsSection").hidden = true;
+      return;
+    }
+
+    // Top-Nadel
+    const topNadel = A.aggregateBy(filtered, "nadel")[0];
+    if (topNadel && topNadel.gesamt != null) {
+      insights.push("Beliebteste Nadel: <strong>" + A.escapeHtml(topNadel.key) + "</strong> mit Ø " + A.num(topNadel.gesamt) + " (n=" + topNadel.n + ")");
+    }
+    // Top-Garn
+    const topGarn = A.aggregateBy(filtered, "garn")[0];
+    if (topGarn && topGarn.gesamt != null) {
+      insights.push("Beliebtestes Garn: <strong>" + A.escapeHtml(topGarn.key) + "</strong> mit Ø " + A.num(topGarn.gesamt) + " (n=" + topGarn.n + ")");
+    }
+    // Bestes Pairing
+    const pair = A.pairings(filtered, 1)[0];
+    if (pair && pair.gesamt != null) {
+      insights.push("Beste Kombi: <strong>" + A.escapeHtml(pair.nadel) + "</strong> auf <strong>" + A.escapeHtml(pair.garn) + "</strong> (Ø " + A.num(pair.gesamt) + ", n=" + pair.n + ")");
+    }
+    // Korrelation
+    const r = A.pearson(filtered.map((x) => x.handgefuehl), filtered.map((x) => x.maschenbild));
+    if (r != null) {
+      const str = Math.abs(r) > 0.6 ? "stark" : Math.abs(r) > 0.3 ? "mittel" : "schwach";
+      insights.push("Handgefühl und Maschenbild korrelieren <strong>" + str + "</strong> (r = " + r.toFixed(2) + ")");
+    }
+    // Polarisierende Nadel
+    const disp = A.dispersion(filtered, "nadel");
+    if (disp.length > 0 && disp[0].streuung > 0.7) {
+      insights.push("Polarisierend: <strong>" + A.escapeHtml(disp[0].key) + "</strong> spaltet die Meinungen (Streuung " + A.num(disp[0].streuung) + ")");
+    }
+
+    $("insightsSection").hidden = false;
+    $("insights").innerHTML = insights.map((i) => '<div class="insight">' + i + '</div>').join("");
+  }
+
+  function renderTopList(canvasId, key, limit) {
+    const top = A.aggregateBy(filtered, key).filter((r) => r.gesamt != null).slice(0, limit || 8);
+    horizontalBar(canvasId, top.map((r) => r.key + "  (n=" + r.n + ")"), top.map((r) => r.gesamt), "Ø");
+  }
+
+  function renderDimensions(canvasId, key) {
+    const agg = A.aggregateBy(filtered, key).slice(0, 12);
+    if (agg.length === 0) return groupedBars(canvasId, ["—"], []);
+    groupedBars(canvasId, agg.map((r) => r.key), [
+      { label: "Handgefühl", data: agg.map((r) => r.handgefuehl), backgroundColor: LAV_DEEP + "cc", borderRadius: 6 },
+      { label: "Maschenbild", data: agg.map((r) => r.maschenbild), backgroundColor: LAV + "cc", borderRadius: 6 },
+      { label: "Match", data: agg.map((r) => r.match), backgroundColor: HEART + "cc", borderRadius: 6 },
+    ]);
+  }
+
+  function renderMaterial() {
+    const agg = A.aggregateBy(filtered.filter((r) => r.nadelMaterial), "nadelMaterial");
+    if (agg.length === 0) return horizontalBar("cMaterial", [], [], "Ø");
+    horizontalBar("cMaterial", agg.map((r) => r.key + "  (n=" + r.n + ")"), agg.map((r) => r.gesamt), "Ø");
+  }
+
+  function renderFaserart() {
+    const agg = A.aggregateByMulti(filtered, "garnFaserart");
+    if (agg.length === 0) return horizontalBar("cFaserart", [], [], "Ø");
+    horizontalBar("cFaserart", agg.map((r) => r.key + "  (n=" + r.n + ")"), agg.map((r) => r.gesamt), "Ø");
+  }
+
+  function renderPairings() {
+    const all = A.pairings(filtered, 1);
+    const top = all.slice(0, 5);
+    const low = all.slice(-5).reverse();
+
+    function html(list) {
+      if (list.length === 0) return '<p style="color: var(--ink-soft); padding: 10px;">Noch zu wenig Daten.</p>';
+      return list.map((p, i) =>
+        '<div class="pairing">' +
+        '<div class="pairing__rank">' + (i + 1) + '</div>' +
+        '<div class="pairing__pair">' +
+          '<div class="pairing__nadel">' + A.escapeHtml(p.nadel) + '</div>' +
+          '<div class="pairing__garn">auf ' + A.escapeHtml(p.garn) + '</div>' +
+        '</div>' +
+        '<div>' +
+          '<div class="pairing__score">' + A.num(p.gesamt) + '</div>' +
+          '<span class="pairing__n">n = ' + p.n + '</span>' +
+        '</div>' +
+        '</div>'
+      ).join("");
+    }
+    $("topPairings").innerHTML = html(top);
+    $("lowPairings").innerHTML = html(low);
+  }
+
+  function renderHeatmap() {
+    const nadeln = A.uniqueSorted(filtered, "nadel");
+    const garne = A.uniqueSorted(filtered, "garn");
+    if (nadeln.length === 0 || garne.length === 0) {
+      $("heatmap").innerHTML = '<p style="color: var(--ink-soft); padding: 12px;">Noch zu wenig Daten.</p>';
+      return;
+    }
+    let html = '<table class="heatmap"><thead><tr><th></th>';
+    nadeln.forEach((n) => html += '<th>' + A.escapeHtml(n) + '</th>');
+    html += '</tr></thead><tbody>';
+    garne.forEach((g) => {
+      html += '<tr><th>' + A.escapeHtml(g) + '</th>';
+      nadeln.forEach((n) => {
+        const items = filtered.filter((r) => r.garn === g && r.nadel === n);
+        const m = A.avg(items.map((r) => r.match));
+        if (m == null) html += '<td class="cell" style="color: var(--ink-whisper); background: transparent;">·</td>';
+        else {
+          const intensity = (m - 1) / 4;
+          const alpha = 0.15 + intensity * 0.55;
+          const color = intensity > 0.5 ? "#fff" : INK;
+          html += '<td class="cell" style="background: rgba(138, 110, 160, ' + alpha.toFixed(2) + '); color: ' + color + ';" title="' + items.length + ' Antwort(en)">' + m.toFixed(1) + '</td>';
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    $("heatmap").innerHTML = html;
+  }
+
+  function renderKonsens() {
+    const disp = A.dispersion(filtered, "nadel").slice(0, 12);
+    if (disp.length === 0) return groupedBars("cKonsens", ["—"], []);
+    groupedBars("cKonsens", disp.map((r) => r.key + " (n=" + r.n + ")"), [
+      { label: "Streuung (niedrig = großer Konsens)", data: disp.map((r) => r.streuung), backgroundColor: LAV + "cc", borderRadius: 6 },
+    ], { yMax: Math.max(2, Math.ceil(Math.max(...disp.map((d) => d.streuung || 0)) * 1.2 * 10) / 10) });
+  }
+
+  function renderKorrelation() {
+    const points = filtered
+      .filter((r) => Number.isFinite(r.handgefuehl) && Number.isFinite(r.maschenbild))
+      .map((r) => ({ x: r.handgefuehl + (Math.random() - 0.5) * 0.25, y: r.maschenbild + (Math.random() - 0.5) * 0.25 }));
+    const r = A.pearson(filtered.map((x) => x.handgefuehl), filtered.map((x) => x.maschenbild));
+    $("korrelationText").textContent = r == null
+      ? "Noch zu wenig Daten für eine Korrelationsaussage."
+      : "Pearson r = " + r.toFixed(2) + "  (1 = gehen voll zusammen, 0 = unabhängig, −1 = gegenläufig)";
+    destroy("cKorrelation");
+    charts.cKorrelation = new Chart($("cKorrelation").getContext("2d"), {
+      type: "scatter",
+      data: { datasets: [{ label: "Bewertungen", data: points, backgroundColor: LAV + "99", borderColor: LAV_DEEP, pointRadius: 6, pointHoverRadius: 8 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: INK } },
+        scales: {
+          x: { min: 0.5, max: 5.5, title: { display: true, text: "Handgefühl", font: { family: "Cormorant Garamond", size: 14 } }, grid: { color: "rgba(184,161,199,0.12)" } },
+          y: { min: 0.5, max: 5.5, title: { display: true, text: "Maschenbild", font: { family: "Cormorant Garamond", size: 14 } }, grid: { color: "rgba(184,161,199,0.12)" } },
+        },
+      },
+    });
+  }
+
+  function renderVerteilung() {
+    const buckets = [1, 2, 3, 4, 5];
+    const dims = [
+      { key: "handgefuehl", label: "Handgefühl", color: LAV_DEEP },
+      { key: "maschenbild", label: "Maschenbild", color: LAV },
+      { key: "match", label: "Match", color: HEART },
+    ];
+    const datasets = dims.map((d) => ({
+      label: d.label,
+      data: buckets.map((b) => filtered.filter((r) => r[d.key] === b).length),
+      backgroundColor: d.color + "cc", borderRadius: 6,
+    }));
+    groupedBars("cVerteilung", buckets.map((b) => b + " ★"), datasets, { yMax: undefined });
+    if (charts.cVerteilung) charts.cVerteilung.options.scales.y.max = undefined, charts.cVerteilung.update();
+  }
+
+  function renderReihenfolge() {
+    const positions = [1, 2, 3, 4, 5];
+    const datasets = [
+      { label: "Handgefühl", data: positions.map((p) => A.avg(filtered.filter((r) => r.reihenfolge === p).map((r) => r.handgefuehl))), backgroundColor: LAV_DEEP + "cc", borderRadius: 6 },
+      { label: "Maschenbild", data: positions.map((p) => A.avg(filtered.filter((r) => r.reihenfolge === p).map((r) => r.maschenbild))), backgroundColor: LAV + "cc", borderRadius: 6 },
+      { label: "Match", data: positions.map((p) => A.avg(filtered.filter((r) => r.reihenfolge === p).map((r) => r.match))), backgroundColor: HEART + "cc", borderRadius: 6 },
+    ];
+    groupedBars("cReihenfolge", positions.map((p) => p + ". Nadel"), datasets);
+  }
+
+  function renderErfasserinnen() {
+    const stats = A.erfasserinnenStats(filtered);
+    if (stats.length === 0) {
+      $("erfasserinnenSection").hidden = true;
+      return;
+    }
+    $("erfasserinnenSection").hidden = false;
+    const top = stats.slice(0, 15);
+    destroy("cErfasserinnen");
+    charts.cErfasserinnen = new Chart($("cErfasserinnen").getContext("2d"), {
+      type: "bar",
+      data: {
+        labels: top.map((s) => s.name + "  (n=" + s.n + ")"),
+        datasets: [
+          { label: "Ihre durchschnittliche Bewertung", data: top.map((s) => s.gesamt), backgroundColor: LAV + "cc", borderRadius: 6, yAxisID: "y" },
+        ],
+      },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: INK, callbacks: { label: (ctx) => " Ø " + ctx.parsed.x.toFixed(2) } },
+          datalabels: { display: true, anchor: "end", align: "end", color: INK, font: { family: "Cormorant Garamond", size: 13 }, formatter: (v) => v != null ? v.toFixed(2) : "" },
+        },
+        scales: {
+          x: { min: 0, max: 5, grid: { color: "rgba(184,161,199,0.12)" } },
+          y: { grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  function renderTreff() {
+    const grouped = A.groupBy(filtered, "stricktreffDatum");
+    const labels = Object.keys(grouped).filter((d) => d && d !== "—").sort();
+    if (labels.length === 0) return groupedBars("cTreff", ["—"], []);
+    const counts = labels.map((d) => grouped[d].length);
+    destroy("cTreff");
+    charts.cTreff = new Chart($("cTreff").getContext("2d"), {
+      type: "line",
+      data: {
+        labels: labels.map((d) => A.formatDate(d, { day: "2-digit", month: "short" })),
+        datasets: [{
+          label: "Antworten", data: counts,
+          borderColor: LAV_DEEP, backgroundColor: "rgba(138,110,160,0.15)",
+          tension: 0.3, fill: true,
+          pointBackgroundColor: HEART, pointBorderColor: "#fff",
+          pointRadius: 6, pointHoverRadius: 8, borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: INK } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: "rgba(184,161,199,0.12)" }, ticks: { stepSize: 1, precision: 0 } },
+          x: { grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  function renderQuotes() {
+    const withText = filtered.filter((r) => r.bemerkungen && r.bemerkungen.trim().length > 0).slice(0, 16);
+    if (withText.length === 0) {
+      $("quotes").innerHTML = '<p style="color: var(--ink-soft); text-align: center; padding: 30px;">Noch keine Bemerkungen.</p>';
+      return;
+    }
+    $("quotes").innerHTML = withText.map((r) =>
+      '<div class="quote">„' + A.escapeHtml(r.bemerkungen) + '"' +
+      '<div class="quote__meta">' +
+      A.escapeHtml(r.nadel || "?") + ' &nbsp;·&nbsp; ' + A.escapeHtml(r.garn || "?") +
+      (r.erfasserin ? ' &nbsp;·&nbsp; ' + A.escapeHtml(r.erfasserin) : "") +
+      (r.stricktreffDatum ? ' &nbsp;·&nbsp; ' + A.formatDate(r.stricktreffDatum) : "") +
+      '</div></div>'
+    ).join("");
+  }
+
+  function renderTable() {
+    if (filtered.length === 0) {
+      $("tableBody").innerHTML = '<tr><td colspan="10" style="text-align: center; color: var(--ink-soft); padding: 24px;">Keine Einträge.</td></tr>';
+      return;
+    }
+    $("tableBody").innerHTML = filtered.slice(0, 200).map((r) =>
+      '<tr>' +
+      '<td>' + A.formatDate(r.stricktreffDatum) + '</td>' +
+      '<td>' + A.escapeHtml(String(r.station ?? "—")) + '</td>' +
+      '<td>' + A.escapeHtml(r.nadel || "—") + '</td>' +
+      '<td>' + A.escapeHtml(r.garn || "—") + '</td>' +
+      '<td>' + A.escapeHtml(r.erfasserin || "—") + '</td>' +
+      '<td>' + (r.handgefuehl ?? "—") + '</td>' +
+      '<td>' + (r.maschenbild ?? "—") + '</td>' +
+      '<td>' + (r.match ?? "—") + '</td>' +
+      '<td>' + (r.reihenfolge ?? "—") + '</td>' +
+      '<td>' + A.escapeHtml(r.bemerkungen || "") + '</td>' +
+      '</tr>'
+    ).join("");
+  }
+
+  function render() {
+    renderKPIs();
+    renderInsights();
+    renderTopList("cTopNadeln", "nadel", 8);
+    renderTopList("cTopGarne", "garn", 8);
+    renderPairings();
+    renderDimensions("cNadelDetail", "nadel");
+    renderDimensions("cGarnDetail", "garn");
+    renderMaterial();
+    renderFaserart();
+    renderHeatmap();
+    renderKonsens();
+    renderKorrelation();
+    renderVerteilung();
+    renderReihenfolge();
+    renderErfasserinnen();
+    renderTreff();
+    renderQuotes();
+    renderTable();
+  }
+
+  // --------- Export-Buttons ---------
+
+  $("reportBtn").addEventListener("click", () => {
+    const f = readFilters();
+    const params = new URLSearchParams();
+    Object.entries(f).forEach(([k, v]) => { if (v) params.set(k, v); });
+    location.href = "/report" + (params.toString() ? "?" + params.toString() : "");
+  });
+
+  $("csvBtn").addEventListener("click", () => {
+    const header = ["Datum", "Station", "Nadel", "Garn", "Material", "Erfasserin", "Handgefühl", "Maschenbild", "Match", "Reihenfolge", "Bemerkungen"];
+    const lines = [header.join(";")];
+    filtered.forEach((r) => {
+      const row = [
+        r.stricktreffDatum || "",
+        r.station ?? "",
+        r.nadel || "",
+        r.garn || "",
+        r.nadelMaterial || "",
+        r.erfasserin || "",
+        r.handgefuehl ?? "",
+        r.maschenbild ?? "",
+        r.match ?? "",
+        r.reihenfolge ?? "",
+        (r.bemerkungen || "").replace(/[\r\n;]+/g, " "),
+      ];
+      lines.push(row.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(";"));
+    });
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "nadeltest-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  // --------- Load ---------
+
+  async function load() {
+    try {
+      const data = await fetchData();
+      nadelnMeta = data.nadeln || [];
+      garneMeta = data.garne || [];
+      raw = A.enrichRecords(data.antworten || [], nadelnMeta, garneMeta);
+
+      $("loginCard").hidden = true;
+      $("content").hidden = false;
+
+      if (raw.length === 0) {
+        $("emptyState").hidden = false;
+        $("content").hidden = true;
+        return;
+      }
+
+      $("emptyState").hidden = true;
+      filtered = raw.slice();
+      populateFilters();
+      render();
+    } catch (e) {
+      if (e.message !== "auth") showStatus(e.message, "error");
+      throw e;
+    }
+  }
+
+  load().catch(() => {});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bericht · Nadeltest</title>
+<link rel="stylesheet" href="/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="/analytics.js"></script>
+<style>
+  /* --- Bildschirm-spezifisch --- */
+  body { background: #ece6e0; }
+  .report-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--paper);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(138, 110, 160, 0.08);
+  }
+  .report-toolbar__title {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    color: var(--ink);
+    font-size: 16px;
+  }
+
+  /* --- Seitenrahmen wie A4 --- */
+  .sheet {
+    background: var(--paper);
+    max-width: 800px;
+    margin: 24px auto;
+    padding: 60px 56px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Aquarell-Akzente in Ecken */
+  .sheet::before {
+    content: "";
+    position: absolute;
+    top: -60px;
+    right: -60px;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, var(--lavender-whisper) 0%, transparent 70%);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  .sheet::after {
+    content: "";
+    position: absolute;
+    bottom: -60px;
+    left: -60px;
+    width: 180px;
+    height: 180px;
+    background: radial-gradient(circle, var(--heart-soft) 0%, transparent 70%);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .sheet > * { position: relative; z-index: 1; }
+
+  /* --- Cover --- */
+  .cover { text-align: center; padding: 80px 0 40px; }
+  .cover__brand { font-family: var(--font-serif); font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 8px; }
+  .cover__title { font-family: var(--font-script); font-size: 96px; color: var(--lavender-deep); line-height: 0.9; margin: 0 0 8px; }
+  .cover__subtitle { font-family: var(--font-serif); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ink-soft); margin: 0; }
+  .cover__divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 30px 0; color: var(--heart); font-size: 18px; }
+  .cover__divider::before, .cover__divider::after { content: ""; height: 1px; width: 80px; background: linear-gradient(to right, transparent, var(--lavender-soft), transparent); }
+  .cover__meta { font-family: var(--font-serif); font-size: 18px; color: var(--ink); margin: 8px 0 0; }
+  .cover__date { font-family: var(--font-script); font-size: 36px; color: var(--lavender-deep); margin: 16px 0 0; line-height: 1; }
+  .cover__filters { margin-top: 30px; padding: 16px 20px; background: var(--lavender-whisper); border-radius: 16px; display: inline-block; }
+  .cover__filters span { font-family: var(--font-serif); font-size: 14px; color: var(--lavender-deep); margin: 0 8px; }
+
+  /* --- Section --- */
+  .r-section { margin-top: 50px; page-break-inside: avoid; }
+  .r-section__title { font-family: var(--font-script); font-size: 40px; color: var(--lavender-deep); margin: 0 0 4px; line-height: 1; }
+  .r-section__sub { font-family: var(--font-serif); font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 24px; }
+
+  .r-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 20px 0 0; }
+  .r-kpi { background: var(--cream); border-radius: 12px; padding: 18px 14px; text-align: center; border: 1px solid var(--border); }
+  .r-kpi__label { font-family: var(--font-serif); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 4px; }
+  .r-kpi__value { font-family: var(--font-serif); font-size: 30px; color: var(--lavender-deep); margin: 0; line-height: 1; font-weight: 500; }
+  .r-kpi__unit { font-size: 12px; color: var(--ink-soft); margin-left: 4px; }
+
+  .r-tldr { padding: 20px 24px; background: linear-gradient(135deg, var(--lavender-whisper), var(--paper)); border-radius: 16px; border-left: 4px solid var(--lavender); margin: 12px 0; font-family: var(--font-serif); font-size: 15px; line-height: 1.7; color: var(--ink); }
+  .r-tldr ul { padding-left: 20px; margin: 8px 0; }
+  .r-tldr li { margin-bottom: 6px; }
+
+  .r-chart { height: 320px; margin: 12px 0; }
+  .r-chart--small { height: 240px; }
+
+  .r-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  .r-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+  .r-table th, .r-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .r-table th { font-family: var(--font-serif); font-weight: 500; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); background: var(--lavender-whisper); }
+
+  .r-pairing { display: flex; align-items: center; gap: 14px; padding: 10px 12px; background: var(--cream); border-radius: 10px; border: 1px solid var(--border); margin-bottom: 8px; }
+  .r-pairing__rank { font-family: var(--font-script); font-size: 28px; color: var(--lavender-deep); line-height: 1; width: 28px; text-align: center; }
+  .r-pairing__main { flex: 1; }
+  .r-pairing__nadel { font-family: var(--font-serif); font-size: 15px; font-weight: 500; }
+  .r-pairing__garn { font-family: var(--font-sans); font-size: 12px; color: var(--ink-soft); }
+  .r-pairing__score { font-family: var(--font-serif); font-size: 22px; font-weight: 500; color: var(--lavender-deep); }
+  .r-pairing__n { font-size: 10px; color: var(--ink-whisper); display: block; text-align: right; }
+
+  .r-heatmap { border-collapse: separate; border-spacing: 3px; font-size: 11px; margin-top: 10px; width: 100%; }
+  .r-heatmap th, .r-heatmap td { padding: 6px 8px; border-radius: 6px; text-align: center; background: var(--cream); min-width: 50px; }
+  .r-heatmap th { font-family: var(--font-serif); font-weight: 500; background: var(--lavender-whisper); color: var(--lavender-deep); }
+  .r-heatmap td.cell { color: var(--ink); font-family: var(--font-serif); font-weight: 500; font-size: 13px; }
+
+  .r-quote { padding: 12px 14px; background: var(--cream); border-left: 3px solid var(--lavender-soft); border-radius: 8px; margin-bottom: 8px; font-family: var(--font-serif); font-size: 13px; line-height: 1.5; color: var(--ink); }
+  .r-quote__meta { font-family: var(--font-sans); font-size: 10px; color: var(--ink-soft); margin-top: 4px; }
+
+  .r-footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid var(--border); font-family: var(--font-serif); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-whisper); text-align: center; }
+  .r-footer__heart { color: var(--heart); margin: 0 4px; }
+
+  .loading-screen { text-align: center; padding: 100px 20px; }
+  .loading-screen__title { font-family: var(--font-script); font-size: 48px; color: var(--lavender-deep); }
+
+  /* --- Print --- */
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+
+  @media print {
+    body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body::before { display: none; }
+    .no-print, .report-toolbar { display: none !important; }
+    .sheet { box-shadow: none; margin: 0; padding: 0; max-width: 100%; border-radius: 0; }
+    .sheet::before, .sheet::after { display: none; }
+    .r-section { page-break-inside: avoid; }
+    .r-section.page-break { page-break-before: always; }
+    .cover { padding: 40px 0 20px; }
+    .cover__title { font-size: 72px; }
+    .r-chart { height: 260px; }
+    .r-chart--small { height: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="report-toolbar no-print">
+  <div class="report-toolbar__title">📄 Nadeltest-Bericht</div>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <a href="/dashboard" class="btn btn--ghost" style="padding: 10px 18px; font-size: 13px;">← Zurück</a>
+    <button type="button" class="btn" id="printBtn" style="padding: 10px 18px; font-size: 13px;">Als PDF speichern</button>
+  </div>
+</div>
+
+<div id="loginCard" class="card login-card" hidden style="max-width: 400px; margin: 80px auto;">
+  <h2 class="section__title">Admin-Zugang</h2>
+  <div class="field"><input type="password" id="pwInput" placeholder="Passwort" /></div>
+  <button type="button" class="btn btn--block" id="loginBtn">Anmelden</button>
+  <div id="loginError" style="margin-top: 14px;"></div>
+</div>
+
+<div id="loading" class="loading-screen">
+  <div class="loading-screen__title">einen Moment …</div>
+</div>
+
+<div id="report" hidden>
+  <article class="sheet" id="sheet">
+    <!-- wird per JS gefüllt -->
+  </article>
+</div>
+
+<script>
+(function () {
+  const A = window.Analytics;
+
+  const LAV_DEEP = "#8a6ea0", LAV = "#b8a1c7", HEART = "#d89bb8", INK = "#3a3340", INK_SOFT = "#6e6478";
+  const PALETTE = [LAV_DEEP, LAV, HEART, "#a094b5", "#c2a8d4", "#e6b8cf", "#7d6a8e", "#9b86b0"];
+
+  Chart.defaults.font.family = "Outfit, sans-serif";
+  Chart.defaults.color = INK_SOFT;
+  Chart.register(window.ChartDataLabels);
+  Chart.defaults.plugins.datalabels = { display: false };
+
+  let adminPw = sessionStorage.getItem("ndt_pw") || "";
+  const $ = (id) => document.getElementById(id);
+
+  // Filter aus URL
+  const url = new URLSearchParams(location.search);
+  const filters = {
+    treff: url.get("treff") || "",
+    nadel: url.get("nadel") || "",
+    garn: url.get("garn") || "",
+    erfasserin: url.get("erfasserin") || "",
+    material: url.get("material") || "",
+    faserart: url.get("faserart") || "",
+  };
+
+  async function fetchData() {
+    const headers = {};
+    if (adminPw) headers["X-Admin-Password"] = adminPw;
+    const res = await fetch("/api/results", { headers });
+    if (res.status === 401) { $("loginCard").hidden = false; $("loading").hidden = true; throw new Error("auth"); }
+    if (!res.ok) throw new Error("Daten konnten nicht geladen werden");
+    return res.json();
+  }
+
+  $("loginBtn")?.addEventListener("click", async () => {
+    adminPw = $("pwInput").value;
+    sessionStorage.setItem("ndt_pw", adminPw);
+    try { await run(); $("loginCard").hidden = true; $("loading").hidden = false; } catch (e) {
+      if (e.message === "auth") $("loginError").innerHTML = '<div class="banner banner--error">Passwort falsch.</div>';
+    }
+  });
+
+  $("printBtn").addEventListener("click", () => window.print());
+
+  function applyFilters(records) {
+    return records.filter((r) => {
+      if (filters.treff && r.stricktreffDatum !== filters.treff) return false;
+      if (filters.nadel && r.nadel !== filters.nadel) return false;
+      if (filters.garn && r.garn !== filters.garn) return false;
+      if (filters.erfasserin === "__ANON__") { if (r.erfasserin && r.erfasserin.trim()) return false; }
+      else if (filters.erfasserin && r.erfasserin !== filters.erfasserin) return false;
+      if (filters.material && r.nadelMaterial !== filters.material) return false;
+      if (filters.faserart && !(r.garnFaserart || []).includes(filters.faserart)) return false;
+      return true;
+    });
+  }
+
+  function describeFilters() {
+    const parts = [];
+    if (filters.treff) parts.push("Stricktreff: " + A.formatDate(filters.treff));
+    if (filters.nadel) parts.push("Nadel: " + filters.nadel);
+    if (filters.garn) parts.push("Garn: " + filters.garn);
+    if (filters.material) parts.push("Material: " + filters.material);
+    if (filters.faserart) parts.push("Faserart: " + filters.faserart);
+    if (filters.erfasserin === "__ANON__") parts.push("nur anonym");
+    else if (filters.erfasserin) parts.push("Erfasserin: " + filters.erfasserin);
+    return parts;
+  }
+
+  // ---------- Bausteine ----------
+
+  function renderCover(records) {
+    const s = A.summary(records);
+    const fp = describeFilters();
+    const today = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+
+    return `
+      <header class="cover">
+        <p class="cover__brand">Bad Mergentheim Knitting</p>
+        <h1 class="cover__title">Nadeltest</h1>
+        <p class="cover__subtitle">Bericht</p>
+        <div class="cover__divider"><span class="heart">♡</span></div>
+        ${filters.treff
+          ? `<p class="cover__meta">Stricktreff am</p><p class="cover__date">${A.formatDate(filters.treff, { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</p>`
+          : `<p class="cover__meta">Alle Stricktreffs</p><p class="cover__date">${today}</p>`}
+        <p class="cover__meta" style="margin-top: 24px; font-size: 14px; color: var(--ink-soft);">
+          ${s.total} Bewertungen · ${s.nadeln} Nadeln · ${s.garne} Garne
+        </p>
+        ${fp.length > 0 ? `<div class="cover__filters">${fp.map((p) => `<span>${A.escapeHtml(p)}</span>`).join("")}</div>` : ""}
+      </header>
+    `;
+  }
+
+  function renderTLDR(records) {
+    const s = A.summary(records);
+    if (s.total < 3) {
+      return `<div class="r-tldr">Noch zu wenig Antworten für eine belastbare Zusammenfassung.</div>`;
+    }
+    const topNadel = A.aggregateBy(records, "nadel")[0];
+    const topGarn = A.aggregateBy(records, "garn")[0];
+    const pair = A.pairings(records, 1)[0];
+    const r = A.pearson(records.map((x) => x.handgefuehl), records.map((x) => x.maschenbild));
+    const disp = A.dispersion(records, "nadel")[0];
+
+    const bullets = [];
+    if (topNadel) bullets.push(`Beliebteste Nadel: <strong>${A.escapeHtml(topNadel.key)}</strong> (Ø ${A.num(topNadel.gesamt)}, n=${topNadel.n})`);
+    if (topGarn) bullets.push(`Beliebtestes Garn: <strong>${A.escapeHtml(topGarn.key)}</strong> (Ø ${A.num(topGarn.gesamt)}, n=${topGarn.n})`);
+    if (pair) bullets.push(`Beste Kombination: <strong>${A.escapeHtml(pair.nadel)}</strong> auf <strong>${A.escapeHtml(pair.garn)}</strong> (Ø ${A.num(pair.gesamt)})`);
+    if (r != null) {
+      const str = Math.abs(r) > 0.6 ? "stark" : Math.abs(r) > 0.3 ? "mittel" : "schwach";
+      bullets.push(`Handgefühl und Maschenbild korrelieren <strong>${str}</strong> (r = ${r.toFixed(2)})`);
+    }
+    if (disp && disp.streuung > 0.7) {
+      bullets.push(`Polarisierend: <strong>${A.escapeHtml(disp.key)}</strong> spaltet die Meinungen (Streuung ${A.num(disp.streuung)})`);
+    }
+
+    return `<div class="r-tldr"><strong>Auf einen Blick</strong><ul>${bullets.map((b) => `<li>${b}</li>`).join("")}</ul></div>`;
+  }
+
+  function renderKPIs(records) {
+    const s = A.summary(records);
+    const cells = [
+      { label: "Antworten", value: s.total },
+      { label: "Stricktreffs", value: s.treffe },
+      { label: "Nadeln", value: s.nadeln },
+      { label: "Garne", value: s.garne },
+      { label: "Erfasserinnen", value: s.erfasserinnen || 0 },
+      { label: "Gesamt-Ø", value: A.num(s.gesamtschnitt), unit: "/ 5" },
+    ];
+    return `<div class="r-kpi-grid">${cells.map((k) => `
+      <div class="r-kpi">
+        <p class="r-kpi__label">${A.escapeHtml(k.label)}</p>
+        <p class="r-kpi__value">${A.escapeHtml(String(k.value))}${k.unit ? `<span class="r-kpi__unit">${k.unit}</span>` : ""}</p>
+      </div>`).join("")}</div>`;
+  }
+
+  function renderPairings(records) {
+    const all = A.pairings(records, 1);
+    const top = all.slice(0, 5);
+    const low = all.slice(-Math.min(3, all.length)).reverse();
+    function html(list) {
+      if (list.length === 0) return `<p style="color: var(--ink-soft);">—</p>`;
+      return list.map((p, i) => `
+        <div class="r-pairing">
+          <div class="r-pairing__rank">${i + 1}</div>
+          <div class="r-pairing__main">
+            <div class="r-pairing__nadel">${A.escapeHtml(p.nadel)}</div>
+            <div class="r-pairing__garn">auf ${A.escapeHtml(p.garn)}</div>
+          </div>
+          <div>
+            <div class="r-pairing__score">${A.num(p.gesamt)}</div>
+            <span class="r-pairing__n">n = ${p.n}</span>
+          </div>
+        </div>`).join("");
+    }
+    return `
+      <div class="r-two-col">
+        <div><h3 style="font-family: var(--font-serif); font-size: 16px; margin: 0 0 10px;">Top 5 Pairings</h3>${html(top)}</div>
+        <div><h3 style="font-family: var(--font-serif); font-size: 16px; margin: 0 0 10px;">Schwächere Pairings</h3>${html(low)}</div>
+      </div>`;
+  }
+
+  function renderHeatmap(records) {
+    const nadeln = A.uniqueSorted(records, "nadel");
+    const garne = A.uniqueSorted(records, "garn");
+    if (nadeln.length === 0 || garne.length === 0) return `<p style="color: var(--ink-soft);">Noch zu wenig Daten.</p>`;
+    let html = `<table class="r-heatmap"><thead><tr><th></th>`;
+    nadeln.forEach((n) => (html += `<th>${A.escapeHtml(n)}</th>`));
+    html += `</tr></thead><tbody>`;
+    garne.forEach((g) => {
+      html += `<tr><th>${A.escapeHtml(g)}</th>`;
+      nadeln.forEach((n) => {
+        const items = records.filter((r) => r.garn === g && r.nadel === n);
+        const m = A.avg(items.map((r) => r.match));
+        if (m == null) html += `<td class="cell" style="color: var(--ink-whisper); background: transparent;">·</td>`;
+        else {
+          const intensity = (m - 1) / 4;
+          const alpha = 0.15 + intensity * 0.55;
+          const color = intensity > 0.5 ? "#fff" : INK;
+          html += `<td class="cell" style="background: rgba(138, 110, 160, ${alpha.toFixed(2)}); color: ${color};">${m.toFixed(1)}</td>`;
+        }
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+    return html;
+  }
+
+  function renderQuotes(records) {
+    const withText = records.filter((r) => r.bemerkungen && r.bemerkungen.trim()).slice(0, 12);
+    if (withText.length === 0) return `<p style="color: var(--ink-soft);">Noch keine Bemerkungen.</p>`;
+    return withText.map((r) => `
+      <div class="r-quote">„${A.escapeHtml(r.bemerkungen)}"
+        <div class="r-quote__meta">${A.escapeHtml(r.nadel || "?")} · ${A.escapeHtml(r.garn || "?")}${r.erfasserin ? ` · ${A.escapeHtml(r.erfasserin)}` : ""}${r.stricktreffDatum ? ` · ${A.formatDate(r.stricktreffDatum)}` : ""}</div>
+      </div>`).join("");
+  }
+
+  function renderTable(records) {
+    if (records.length === 0) return `<p style="color: var(--ink-soft);">—</p>`;
+    return `
+      <table class="r-table">
+        <thead><tr>
+          <th>Datum</th><th>St.</th><th>Nadel</th><th>Garn</th><th>Erfasserin</th><th>Hand</th><th>Bild</th><th>Match</th><th>Reih.</th>
+        </tr></thead>
+        <tbody>${records.map((r) => `
+          <tr>
+            <td>${A.formatDate(r.stricktreffDatum, { day: "2-digit", month: "2-digit", year: "2-digit" })}</td>
+            <td>${r.station ?? "—"}</td>
+            <td>${A.escapeHtml(r.nadel || "—")}</td>
+            <td>${A.escapeHtml(r.garn || "—")}</td>
+            <td>${A.escapeHtml(r.erfasserin || "—")}</td>
+            <td>${r.handgefuehl ?? "—"}</td>
+            <td>${r.maschenbild ?? "—"}</td>
+            <td>${r.match ?? "—"}</td>
+            <td>${r.reihenfolge ?? "—"}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>`;
+  }
+
+  function buildChartTopList(records, key, limit) {
+    const agg = A.aggregateBy(records, key).filter((r) => r.gesamt != null).slice(0, limit || 6);
+    return {
+      labels: agg.map((r) => r.key + " (n=" + r.n + ")"),
+      values: agg.map((r) => r.gesamt),
+    };
+  }
+
+  function makeHorizontalBar(canvasId, labels, values) {
+    if (labels.length === 0) { labels = ["—"]; values = [0]; }
+    new Chart($(canvasId).getContext("2d"), {
+      type: "bar",
+      data: { labels, datasets: [{ data: values, backgroundColor: labels.map((_, i) => PALETTE[i % PALETTE.length] + "cc"), borderRadius: 6 }] },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: { display: true, anchor: "end", align: "end", color: INK, font: { family: "Cormorant Garamond", size: 11 }, formatter: (v) => Number.isFinite(v) ? v.toFixed(2) : "" },
+        },
+        scales: {
+          x: { min: 0, max: 5, ticks: { stepSize: 1, font: { size: 10 } } },
+          y: { ticks: { font: { family: "Outfit", size: 10 } } },
+        },
+      },
+    });
+  }
+
+  function makeGroupedBars(canvasId, labels, datasets, yMax) {
+    new Chart($(canvasId).getContext("2d"), {
+      type: "bar",
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { position: "bottom", labels: { font: { size: 11 } } } },
+        scales: {
+          y: { min: 0, max: yMax || 5, ticks: { font: { size: 10 } } },
+          x: { ticks: { font: { size: 10 }, maxRotation: 35 } },
+        },
+      },
+    });
+  }
+
+  // ---------- Composition ----------
+
+  function buildReport(records) {
+    const sheet = $("sheet");
+    const materialAgg = A.aggregateBy(records.filter((r) => r.nadelMaterial), "nadelMaterial");
+    const faserartAgg = A.aggregateByMulti(records, "garnFaserart");
+
+    sheet.innerHTML = `
+      ${renderCover(records)}
+
+      <section class="r-section">
+        <h2 class="r-section__title">Zusammenfassung</h2>
+        <p class="r-section__sub">Executive Summary</p>
+        ${renderTLDR(records)}
+        ${renderKPIs(records)}
+      </section>
+
+      <section class="r-section page-break">
+        <h2 class="r-section__title">Lieblings-Nadeln &amp; Garne</h2>
+        <p class="r-section__sub">Nach Gesamtschnitt</p>
+        <div class="r-two-col">
+          <div><h3 style="font-family: var(--font-serif); font-size: 16px; margin: 0 0 10px;">Top Nadeln</h3><div class="r-chart r-chart--small"><canvas id="rTopNadeln"></canvas></div></div>
+          <div><h3 style="font-family: var(--font-serif); font-size: 16px; margin: 0 0 10px;">Top Garne</h3><div class="r-chart r-chart--small"><canvas id="rTopGarne"></canvas></div></div>
+        </div>
+      </section>
+
+      <section class="r-section">
+        <h2 class="r-section__title">Pairings</h2>
+        <p class="r-section__sub">Welche Garn-Nadel-Kombination passt?</p>
+        ${renderPairings(records)}
+      </section>
+
+      <section class="r-section page-break">
+        <h2 class="r-section__title">Match-Matrix</h2>
+        <p class="r-section__sub">Garn × Nadel</p>
+        ${renderHeatmap(records)}
+      </section>
+
+      ${(materialAgg.length > 0 || faserartAgg.length > 0) ? `
+      <section class="r-section">
+        <h2 class="r-section__title">Material &amp; Faserart</h2>
+        <p class="r-section__sub">Aggregierte Sicht</p>
+        <div class="r-two-col">
+          <div><h3 style="font-family: var(--font-serif); font-size: 16px; margin: 0 0 10px;">Pro Material</h3><div class="r-chart r-chart--small"><canvas id="rMaterial"></canvas></div></div>
+          <div><h3 style="font-family: var(--font-serif); font-size: 16px; margin: 0 0 10px;">Pro Faserart</h3><div class="r-chart r-chart--small"><canvas id="rFaserart"></canvas></div></div>
+        </div>
+      </section>` : ""}
+
+      <section class="r-section page-break">
+        <h2 class="r-section__title">Verteilung &amp; Reihenfolge</h2>
+        <p class="r-section__sub">Wie wurde bewertet?</p>
+        <div class="r-two-col">
+          <div><h3 style="font-family: var(--font-serif); font-size: 16px; margin: 0 0 10px;">Verteilung pro Dimension</h3><div class="r-chart r-chart--small"><canvas id="rVerteilung"></canvas></div></div>
+          <div><h3 style="font-family: var(--font-serif); font-size: 16px; margin: 0 0 10px;">Reihenfolge-Effekt</h3><div class="r-chart r-chart--small"><canvas id="rReihenfolge"></canvas></div></div>
+        </div>
+      </section>
+
+      <section class="r-section page-break">
+        <h2 class="r-section__title">Stimmen</h2>
+        <p class="r-section__sub">Aus dem Stricktreff</p>
+        ${renderQuotes(records)}
+      </section>
+
+      <section class="r-section page-break">
+        <h2 class="r-section__title">Alle Bewertungen</h2>
+        <p class="r-section__sub">Im Detail</p>
+        ${renderTable(records)}
+      </section>
+
+      <footer class="r-footer">
+        Bad Mergentheim Knitting <span class="r-footer__heart">♡</span> Stricktreff · Bericht erstellt am ${new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" })}
+      </footer>
+    `;
+
+    // Charts nachträglich rendern (DOM muss da sein)
+    setTimeout(() => {
+      const nadelnTop = buildChartTopList(records, "nadel", 6);
+      makeHorizontalBar("rTopNadeln", nadelnTop.labels, nadelnTop.values);
+      const garneTop = buildChartTopList(records, "garn", 6);
+      makeHorizontalBar("rTopGarne", garneTop.labels, garneTop.values);
+
+      if (materialAgg.length > 0) {
+        makeHorizontalBar("rMaterial", materialAgg.map((r) => r.key + " (n=" + r.n + ")"), materialAgg.map((r) => r.gesamt));
+      }
+      if (faserartAgg.length > 0) {
+        makeHorizontalBar("rFaserart", faserartAgg.map((r) => r.key + " (n=" + r.n + ")"), faserartAgg.map((r) => r.gesamt));
+      }
+
+      // Verteilung
+      const buckets = [1, 2, 3, 4, 5];
+      makeGroupedBars("rVerteilung", buckets.map((b) => b + " ★"), [
+        { label: "Handgefühl", data: buckets.map((b) => records.filter((r) => r.handgefuehl === b).length), backgroundColor: LAV_DEEP + "cc", borderRadius: 4 },
+        { label: "Maschenbild", data: buckets.map((b) => records.filter((r) => r.maschenbild === b).length), backgroundColor: LAV + "cc", borderRadius: 4 },
+        { label: "Match", data: buckets.map((b) => records.filter((r) => r.match === b).length), backgroundColor: HEART + "cc", borderRadius: 4 },
+      ], Math.max(5, records.length));
+
+      // Reihenfolge
+      const pos = [1, 2, 3, 4, 5];
+      makeGroupedBars("rReihenfolge", pos.map((p) => p + "."), [
+        { label: "Handgefühl", data: pos.map((p) => A.avg(records.filter((r) => r.reihenfolge === p).map((r) => r.handgefuehl))), backgroundColor: LAV_DEEP + "cc", borderRadius: 4 },
+        { label: "Maschenbild", data: pos.map((p) => A.avg(records.filter((r) => r.reihenfolge === p).map((r) => r.maschenbild))), backgroundColor: LAV + "cc", borderRadius: 4 },
+        { label: "Match", data: pos.map((p) => A.avg(records.filter((r) => r.reihenfolge === p).map((r) => r.match))), backgroundColor: HEART + "cc", borderRadius: 4 },
+      ]);
+    }, 100);
+  }
+
+  async function run() {
+    const data = await fetchData();
+    const records = A.enrichRecords(data.antworten || [], data.nadeln || [], data.garne || []);
+    const filtered = applyFilters(records);
+
+    $("loading").hidden = true;
+    $("report").hidden = false;
+
+    if (filtered.length === 0) {
+      $("sheet").innerHTML = `
+        ${renderCover(filtered)}
+        <section class="r-section">
+          <div class="r-tldr">Für diese Auswahl liegen noch keine Antworten vor.</div>
+        </section>
+        <footer class="r-footer">Bad Mergentheim Knitting <span class="r-footer__heart">♡</span> Stricktreff</footer>
+      `;
+      return;
+    }
+
+    buildReport(filtered);
+  }
+
+  run().catch((e) => {
+    if (e.message !== "auth") {
+      $("loading").innerHTML = '<div style="color: var(--ink-soft);">' + A.escapeHtml(e.message) + '</div>';
+    }
+  });
+})();
+</script>
+</body>
+</html>
