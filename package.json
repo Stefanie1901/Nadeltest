@@ -1,0 +1,12 @@
+{
+  "name": "nadeltest",
+  "version": "1.0.0",
+  "description": "Anonymer Fragebogen für den Stricktreff-Nadeltest. Notion als Backend, Vercel als Hosting.",
+  "private": true,
+  "dependencies": {
+    "@notionhq/client": "^2.2.15"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
