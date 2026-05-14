@@ -7,16 +7,52 @@
 <link rel="stylesheet" href="/styles.css" />
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <style>
-  .station-row { display: grid; grid-template-columns: 80px 1fr auto; gap: 12px; align-items: end; margin-bottom: 14px; padding: 14px; background: var(--cream); border-radius: 12px; border: 1px solid var(--border); }
-  .station-row select, .station-row input { margin: 0; }
-  .icon-btn { background: transparent; border: 1px solid var(--border); border-radius: 10px; width: 40px; height: 40px; cursor: pointer; color: var(--ink-soft); font-size: 18px; transition: all 0.15s; }
-  .icon-btn:hover { color: var(--lavender-deep); border-color: var(--lavender); }
-  .station-row__label { font-family: var(--font-serif); font-size: 12px; letter-spacing: 0.12em; color: var(--ink-soft); text-transform: uppercase; margin-bottom: 4px; display: block; }
-  #debugLog { background: #2b2435; color: #e8dfee; padding: 16px; border-radius: 12px; margin-bottom: 20px; font-family: monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
-  #debugLog .ok { color: #8bc88b; }
-  #debugLog .err { color: #ff8b8b; }
-  #debugLog .info { color: #b8a1c7; }
-  @media print { body { background: white; } body::before { display: none; } .no-print { display: none !important; } .qr-card { page-break-inside: avoid; box-shadow: none; } .qr-grid { grid-template-columns: 1fr 1fr; gap: 14px; } }
+  .station-row {
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+    padding: 14px;
+    background: var(--cream);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .station-row select,
+  .station-row input {
+    margin: 0;
+  }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-size: 18px;
+    transition: all 0.15s;
+  }
+  .icon-btn:hover {
+    color: var(--lavender-deep);
+    border-color: var(--lavender);
+  }
+  .station-row__label {
+    font-family: var(--font-serif);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    display: block;
+  }
+  @media print {
+    body { background: white; }
+    body::before { display: none; }
+    .no-print { display: none !important; }
+    .qr-card { page-break-inside: avoid; box-shadow: none; }
+    .qr-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -29,7 +65,6 @@
     <div class="divider"><span class="heart">♡</span></div>
   </header>
 
-  <div id="debugLog" class="no-print"></div>
   <div id="status"></div>
 
   <section class="card fade-in no-print">
@@ -41,7 +76,9 @@
   <section class="card fade-in no-print">
     <h2 class="section__title">2 · Stationen</h2>
     <p class="section__sub">Pro Station: Nummer und Garn aus dem Korb wählen.</p>
+
     <div id="stations"></div>
+
     <button type="button" class="btn btn--ghost" id="addStation" style="margin-top: 12px;">+ Station hinzufügen</button>
   </section>
 
@@ -66,149 +103,125 @@
 </main>
 
 <script>
-// === DEBUG-VERSION ===
-const debugEl = document.getElementById("debugLog");
-function log(msg, cls) {
-  const line = document.createElement("div");
-  line.className = cls || "";
-  line.textContent = "[" + new Date().toISOString().substr(11, 8) + "] " + msg;
-  debugEl.appendChild(line);
-  console.log(msg);
-}
-
-window.addEventListener("error", (e) => {
-  log("FENSTER-FEHLER: " + e.message + "  @  " + e.filename + ":" + e.lineno, "err");
-});
-window.addEventListener("unhandledrejection", (e) => {
-  log("PROMISE-FEHLER: " + (e.reason?.message || e.reason), "err");
-});
-
-log("Debug-Modus aktiv. Lädt …", "info");
-</script>
-
-<script>
 (function () {
-  try {
-    log("Script-Start", "info");
+  const stationsEl = document.getElementById("stations");
+  const addBtn = document.getElementById("addStation");
+  const generateBtn = document.getElementById("generateBtn");
+  const printBtn = document.getElementById("printBtn");
+  const datumEl = document.getElementById("datum");
+  const qrOutput = document.getElementById("qrOutput");
+  const qrGrid = document.getElementById("qrGrid");
+  const qrDateLine = document.getElementById("qrDateLine");
+  const statusEl = document.getElementById("status");
 
-    const stationsEl = document.getElementById("stations");
-    const addBtn = document.getElementById("addStation");
-    const generateBtn = document.getElementById("generateBtn");
-    const printBtn = document.getElementById("printBtn");
-    const datumEl = document.getElementById("datum");
-    const qrOutput = document.getElementById("qrOutput");
-    const qrGrid = document.getElementById("qrGrid");
-    const qrDateLine = document.getElementById("qrDateLine");
-    const statusEl = document.getElementById("status");
+  // Datum auf heute setzen
+  datumEl.valueAsDate = new Date();
 
-    log("DOM-Refs: stationsEl=" + !!stationsEl + " addBtn=" + !!addBtn + " datumEl=" + !!datumEl, "info");
+  let garne = [];
+  let stationCount = 0;
 
+  function showStatus(msg, type) {
+    statusEl.innerHTML = '<div class="banner banner--' + (type || "info") + '">' + msg + '</div>';
+    // Banner sichtbar scrollen
+    statusEl.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  function clearStatus() { statusEl.innerHTML = ""; }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  function buildStationRow(nr) {
+    const wrap = document.createElement("div");
+    wrap.className = "station-row";
+    wrap.dataset.station = nr;
+
+    const colNr = document.createElement("div");
+    colNr.innerHTML =
+      '<span class="station-row__label">Station</span>' +
+      '<input type="number" min="1" max="20" value="' + nr + '" class="station-nr" />';
+
+    const colGarn = document.createElement("div");
+    let options = '<option value="">Bitte Garn wählen…</option>';
+    garne.forEach((g) => {
+      const label = g.hersteller ? g.hersteller + " — " + g.name : g.name;
+      options += '<option value="' + escapeAttr(g.name) + '">' + escapeHtml(label) + "</option>";
+    });
+    colGarn.innerHTML =
+      '<span class="station-row__label">Garn an dieser Station</span>' +
+      '<select class="station-garn">' + options + '</select>';
+
+    const colDel = document.createElement("div");
+    colDel.innerHTML = '<button type="button" class="icon-btn" title="Entfernen">×</button>';
+    colDel.querySelector("button").addEventListener("click", () => wrap.remove());
+
+    wrap.appendChild(colNr);
+    wrap.appendChild(colGarn);
+    wrap.appendChild(colDel);
+    return wrap;
+  }
+
+  function addStation() {
+    stationCount += 1;
+    stationsEl.appendChild(buildStationRow(stationCount));
+  }
+
+  async function loadOptions() {
     try {
-      datumEl.valueAsDate = new Date();
-      log("Datum gesetzt: " + datumEl.value, "ok");
-    } catch (e) {
-      log("Datum-Fehler: " + e.message, "err");
-    }
-
-    let garne = [];
-    let stationCount = 0;
-
-    function showStatus(msg, type) {
-      statusEl.innerHTML = '<div class="banner banner--' + (type || "info") + '">' + msg + '</div>';
-    }
-
-    function buildStationRow(nr) {
-      log("buildStationRow(" + nr + ") gestartet", "info");
-      const wrap = document.createElement("div");
-      wrap.className = "station-row";
-      wrap.dataset.station = nr;
-
-      const colNr = document.createElement("div");
-      colNr.innerHTML =
-        '<span class="station-row__label">Station</span>' +
-        '<input type="number" min="1" max="20" value="' + nr + '" class="station-nr" />';
-
-      const colGarn = document.createElement("div");
-      let options = '<option value="">Bitte Garn wählen…</option>';
-      garne.forEach((g) => {
-        const label = g.hersteller ? g.hersteller + " — " + g.name : g.name;
-        options += '<option value="' + escapeAttr(g.name) + '">' + escapeHtml(label) + "</option>";
-      });
-      colGarn.innerHTML =
-        '<span class="station-row__label">Garn an dieser Station</span>' +
-        '<select class="station-garn">' + options + '</select>';
-
-      const colDel = document.createElement("div");
-      colDel.innerHTML = '<button type="button" class="icon-btn" title="Entfernen">×</button>';
-      colDel.querySelector("button").addEventListener("click", () => wrap.remove());
-
-      wrap.appendChild(colNr);
-      wrap.appendChild(colGarn);
-      wrap.appendChild(colDel);
-      log("buildStationRow(" + nr + ") fertig", "ok");
-      return wrap;
-    }
-
-    function addStation() {
-      try {
-        stationCount += 1;
-        log("addStation() #" + stationCount, "info");
-        const row = buildStationRow(stationCount);
-        stationsEl.appendChild(row);
-        log("Station " + stationCount + " angehängt", "ok");
-      } catch (e) {
-        log("addStation FEHLER: " + e.message + " | Stack: " + e.stack, "err");
+      const res = await fetch("/api/options");
+      if (!res.ok) throw new Error("Konnte Garne nicht laden (HTTP " + res.status + ").");
+      const data = await res.json();
+      garne = data.garne || [];
+      if (garne.length === 0) {
+        showStatus("In Notion sind noch keine aktiven Garne eingetragen. Bitte erst Garne in der Garn-DB anlegen und „Aktiv" anhaken.", "error");
       }
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-    }
-    function escapeAttr(s) { return escapeHtml(s); }
-
-    async function loadOptions() {
-      try {
-        log("Fetch /api/options …", "info");
-        const res = await fetch("/api/options");
-        log("API-Antwort: HTTP " + res.status, res.ok ? "ok" : "err");
-        if (!res.ok) throw new Error("Konnte Garne nicht laden (HTTP " + res.status + ")");
-        const data = await res.json();
-        log("Daten geparst. Garne: " + (data.garne?.length ?? "?") + ", Nadeln: " + (data.nadeln?.length ?? "?"), "ok");
-        garne = data.garne || [];
-        if (garne.length === 0) {
-          log("Keine aktiven Garne in Notion!", "err");
-          showStatus("In Notion sind noch keine aktiven Garne eingetragen.", "error");
-        }
-        log("Lege 3 Stationen an …", "info");
-        addStation(); addStation(); addStation();
-        log("Setup fertig.", "ok");
-      } catch (err) {
-        log("loadOptions FEHLER: " + err.message, "err");
-        showStatus(err.message, "error");
-      }
-    }
-
-    log("Event-Listener für addBtn anhängen", "info");
-    addBtn.addEventListener("click", () => {
-      log("addBtn KLICK", "info");
       addStation();
+    } catch (err) {
+      showStatus(err.message, "error");
+    }
+  }
+
+  addBtn.addEventListener("click", addStation);
+
+  generateBtn.addEventListener("click", async () => {
+    clearStatus();
+
+    const datum = datumEl.value;
+    if (!datum) return showStatus("Bitte erst ein Datum wählen.", "error");
+
+    const rows = Array.from(document.querySelectorAll(".station-row"));
+    if (rows.length === 0) {
+      return showStatus("Bitte mindestens eine Station hinzufügen.", "error");
+    }
+
+    // Prüfen, was unvollständig ist
+    const incomplete = [];
+    const stations = [];
+    rows.forEach((r, idx) => {
+      const nr = r.querySelector(".station-nr").value.trim();
+      const garn = r.querySelector(".station-garn").value;
+      if (!nr || !garn) {
+        incomplete.push("Zeile " + (idx + 1) + (nr ? " (Station " + nr + ")" : "") + ": " + (!nr ? "Nummer" : "") + (!nr && !garn ? " und " : "") + (!garn ? "Garn" : "") + " fehlt");
+      } else {
+        stations.push({ nr, garn });
+      }
     });
 
-    generateBtn.addEventListener("click", async () => {
-      log("generateBtn KLICK", "info");
-      const datum = datumEl.value;
-      if (!datum) return showStatus("Bitte erst ein Datum wählen.", "error");
+    if (stations.length === 0) {
+      return showStatus("Bitte bei mindestens einer Station eine Nummer und ein Garn auswählen.", "error");
+    }
 
-      const rows = Array.from(document.querySelectorAll(".station-row"));
-      const stations = rows.map((r) => ({
-        nr: r.querySelector(".station-nr").value,
-        garn: r.querySelector(".station-garn").value,
-      })).filter((s) => s.nr && s.garn);
+    if (incomplete.length > 0) {
+      showStatus("Einige Stationen sind unvollständig und wurden ignoriert: " + incomplete.join("; "), "info");
+    }
 
-      if (stations.length === 0) {
-        return showStatus("Bitte mindestens eine Station mit Nummer und Garn anlegen.", "error");
-      }
+    // QR-Library vorhanden?
+    if (!window.QRCode || typeof window.QRCode.toCanvas !== "function") {
+      return showStatus("Die QR-Code-Library konnte nicht geladen werden. Bitte Internetverbindung prüfen und Seite neu laden.", "error");
+    }
 
+    try {
       qrGrid.innerHTML = "";
       const baseUrl = location.origin;
 
@@ -216,6 +229,7 @@ log("Debug-Modus aktiv. Lädt …", "info");
         const url = baseUrl + "/?station=" + encodeURIComponent(s.nr) +
                     "&garn=" + encodeURIComponent(s.garn) +
                     "&datum=" + encodeURIComponent(datum);
+
         const card = document.createElement("div");
         card.className = "qr-card";
 
@@ -246,7 +260,7 @@ log("Debug-Modus aktiv. Lädt …", "info");
         qrGrid.appendChild(card);
 
         await window.QRCode.toCanvas(canvas, url, {
-          width: 200,
+          width: 220,
           margin: 1,
           color: { dark: "#3a3340", light: "#ffffff" },
           errorCorrectionLevel: "M",
@@ -257,15 +271,14 @@ log("Debug-Modus aktiv. Lädt …", "info");
       qrOutput.hidden = false;
       printBtn.hidden = false;
       qrOutput.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    } catch (err) {
+      showStatus("QR-Codes konnten nicht erstellt werden: " + (err.message || err), "error");
+    }
+  });
 
-    printBtn.addEventListener("click", () => window.print());
+  printBtn.addEventListener("click", () => window.print());
 
-    log("Starte loadOptions() …", "info");
-    loadOptions();
-  } catch (e) {
-    log("TOP-LEVEL-FEHLER: " + e.message + " | Stack: " + e.stack, "err");
-  }
+  loadOptions();
 })();
 </script>
 </body>
