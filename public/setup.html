@@ -115,14 +115,18 @@
   const statusEl = document.getElementById("status");
 
   // Datum auf heute setzen
-  datumEl.valueAsDate = new Date();
+  try {
+    datumEl.valueAsDate = new Date();
+  } catch (e) {
+    const d = new Date();
+    datumEl.value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
 
   let garne = [];
   let stationCount = 0;
 
   function showStatus(msg, type) {
     statusEl.innerHTML = '<div class="banner banner--' + (type || "info") + '">' + msg + '</div>';
-    // Banner sichtbar scrollen
     statusEl.scrollIntoView({ behavior: "smooth", block: "center" });
   }
   function clearStatus() { statusEl.innerHTML = ""; }
@@ -195,14 +199,16 @@
       return showStatus("Bitte mindestens eine Station hinzufügen.", "error");
     }
 
-    // Prüfen, was unvollständig ist
     const incomplete = [];
     const stations = [];
     rows.forEach((r, idx) => {
       const nr = r.querySelector(".station-nr").value.trim();
       const garn = r.querySelector(".station-garn").value;
       if (!nr || !garn) {
-        incomplete.push("Zeile " + (idx + 1) + (nr ? " (Station " + nr + ")" : "") + ": " + (!nr ? "Nummer" : "") + (!nr && !garn ? " und " : "") + (!garn ? "Garn" : "") + " fehlt");
+        let missing = [];
+        if (!nr) missing.push("Nummer");
+        if (!garn) missing.push("Garn");
+        incomplete.push("Zeile " + (idx + 1) + ": " + missing.join(" und ") + " fehlt");
       } else {
         stations.push({ nr, garn });
       }
@@ -216,7 +222,6 @@
       showStatus("Einige Stationen sind unvollständig und wurden ignoriert: " + incomplete.join("; "), "info");
     }
 
-    // QR-Library vorhanden?
     if (!window.QRCode || typeof window.QRCode.toCanvas !== "function") {
       return showStatus("Die QR-Code-Library konnte nicht geladen werden. Bitte Internetverbindung prüfen und Seite neu laden.", "error");
     }
