@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Setup · Nadeltest</title>
+<link rel="stylesheet" href="/styles.css" />
+<script src="/auth-guard.js"></script>
+<!-- QR-Code wird server-seitig via /api/qr generiert -->
+<style>
+  .station-row {
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+    padding: 14px;
+    background: var(--cream);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .station-row select,
+  .station-row input {
+    margin: 0;
+  }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-size: 18px;
+    transition: all 0.15s;
+  }
+  .icon-btn:hover {
+    color: var(--lavender-deep);
+    border-color: var(--lavender);
+  }
+  .station-row__label {
+    font-family: var(--font-serif);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    display: block;
+  }
+  @media print {
+    body { background: white; }
+    body::before { display: none; }
+    .no-print { display: none !important; }
+    .qr-card { page-break-inside: avoid; box-shadow: none; }
+    .qr-grid { grid-template-columns: 1fr 1fr; gap: 14px; }
+  }
+</style>
+</head>
+<body>
+<main class="page page--wide">
+
+  <header class="header fade-in">
+    <p class="header__brand">Bad Mergentheim Knitting</p>
+    <h1 class="header__title">Setup</h1>
+    <p class="header__subtitle">QR-Codes für den Stricktreff</p>
+    <div class="divider"><span class="heart">♡</span></div>
+  </header>
+
+  <div id="status"></div>
+
+  <section class="card fade-in no-print">
+    <h2 class="section__title">1 · Stricktreff-Datum</h2>
+    <p class="section__sub">Wird in jedem QR-Code mitgegeben, damit die Auswertung pro Treff gruppiert werden kann.</p>
+    <input type="date" id="datum" />
+  </section>
+
+  <section class="card fade-in no-print">
+    <h2 class="section__title">2 · Stationen</h2>
+    <p class="section__sub">Pro Station: Nummer und Garn aus dem Korb wählen.</p>
+
+    <div id="stations"></div>
+
+    <button type="button" class="btn btn--ghost" id="addStation" style="margin-top: 12px;">+ Station hinzufügen</button>
+  </section>
+
+  <section class="card fade-in no-print">
+    <h2 class="section__title">3 · QR-Codes generieren</h2>
+    <p class="section__sub">Erst „Generieren" klicken, dann „Drucken" für den Stationsbogen.</p>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <button type="button" class="btn" id="generateBtn">QR-Codes generieren</button>
+      <button type="button" class="btn btn--ghost" id="printBtn" hidden>Drucken</button>
+    </div>
+  </section>
+
+  <section id="qrOutput" hidden>
+    <h2 class="section__title" style="text-align: center; margin-top: 40px;">Stations-QR-Codes</h2>
+    <p class="section__sub" style="text-align: center;" id="qrDateLine">—</p>
+    <div class="qr-grid" id="qrGrid"></div>
+  </section>
+
+  <footer class="footer no-print">
+    Bad Mergentheim Knitting <span class="footer__heart">♡</span> Stricktreff
+  </footer>
+</main>
+
+<script>
+(function () {
+  const stationsEl = document.getElementById("stations");
+  const addBtn = document.getElementById("addStation");
+  const generateBtn = document.getElementById("generateBtn");
+  const printBtn = document.getElementById("printBtn");
+  const datumEl = document.getElementById("datum");
+  const qrOutput = document.getElementById("qrOutput");
+  const qrGrid = document.getElementById("qrGrid");
+  const qrDateLine = document.getElementById("qrDateLine");
+  const statusEl = document.getElementById("status");
+
+  // Datum auf heute setzen
+  try {
+    datumEl.valueAsDate = new Date();
+  } catch (e) {
+    const d = new Date();
+    datumEl.value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  let garne = [];
+  let stationCount = 0;
+
+  function showStatus(msg, type) {
+    statusEl.innerHTML = '<div class="banner banner--' + (type || "info") + '">' + msg + '</div>';
+    statusEl.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  function clearStatus() { statusEl.innerHTML = ""; }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  function buildStationRow(nr) {
+    const wrap = document.createElement("div");
+    wrap.className = "station-row";
+    wrap.dataset.station = nr;
+
+    const colNr = document.createElement("div");
+    colNr.innerHTML =
+      '<span class="station-row__label">Station</span>' +
+      '<input type="number" min="1" max="20" value="' + nr + '" class="station-nr" />';
+
+    const colGarn = document.createElement("div");
+    let options = '<option value="">Bitte Garn wählen…</option>';
+    garne.forEach((g) => {
+      const label = g.hersteller ? g.hersteller + " — " + g.name : g.name;
+      options += '<option value="' + escapeAttr(g.name) + '">' + escapeHtml(label) + "</option>";
+    });
+    colGarn.innerHTML =
+      '<span class="station-row__label">Garn an dieser Station</span>' +
+      '<select class="station-garn">' + options + '</select>';
+
+    const colDel = document.createElement("div");
+    colDel.innerHTML = '<button type="button" class="icon-btn" title="Entfernen">×</button>';
+    colDel.querySelector("button").addEventListener("click", () => wrap.remove());
+
+    wrap.appendChild(colNr);
+    wrap.appendChild(colGarn);
+    wrap.appendChild(colDel);
+    return wrap;
+  }
+
+  function addStation() {
+    stationCount += 1;
+    stationsEl.appendChild(buildStationRow(stationCount));
+  }
+
+  async function loadOptions() {
+    try {
+      const res = await fetch("/api/options");
+      if (!res.ok) throw new Error("Konnte Garne nicht laden (HTTP " + res.status + ").");
+      const data = await res.json();
+      garne = data.garne || [];
+      if (garne.length === 0) {
+        showStatus("In Notion sind noch keine aktiven Garne eingetragen. Bitte erst Garne in der Garn-DB anlegen und Aktiv anhaken.", "error");
+      }
+      addStation();
+    } catch (err) {
+      showStatus(err.message, "error");
+    }
+  }
+
+  addBtn.addEventListener("click", addStation);
+
+  generateBtn.addEventListener("click", async () => {
+    clearStatus();
+
+    const datum = datumEl.value;
+    if (!datum) return showStatus("Bitte erst ein Datum wählen.", "error");
+
+    const rows = Array.from(document.querySelectorAll(".station-row"));
+    if (rows.length === 0) {
+      return showStatus("Bitte mindestens eine Station hinzufügen.", "error");
+    }
+
+    const incomplete = [];
+    const stations = [];
+    rows.forEach((r, idx) => {
+      const nr = r.querySelector(".station-nr").value.trim();
+      const garn = r.querySelector(".station-garn").value;
+      if (!nr || !garn) {
+        let missing = [];
+        if (!nr) missing.push("Nummer");
+        if (!garn) missing.push("Garn");
+        incomplete.push("Zeile " + (idx + 1) + ": " + missing.join(" und ") + " fehlt");
+      } else {
+        stations.push({ nr, garn });
+      }
+    });
+
+    if (stations.length === 0) {
+      return showStatus("Bitte bei mindestens einer Station eine Nummer und ein Garn auswählen.", "error");
+    }
+
+    if (incomplete.length > 0) {
+      showStatus("Einige Stationen sind unvollständig und wurden ignoriert: " + incomplete.join("; "), "info");
+    }
+
+    try {
+      qrGrid.innerHTML = "";
+      const baseUrl = location.origin;
+
+      for (const s of stations) {
+        const url = baseUrl + "/?station=" + encodeURIComponent(s.nr) +
+                    "&garn=" + encodeURIComponent(s.garn) +
+                    "&datum=" + encodeURIComponent(datum);
+
+        const card = document.createElement("div");
+        card.className = "qr-card";
+
+        const title = document.createElement("h3");
+        title.className = "qr-card__title";
+        title.textContent = "Station " + s.nr;
+
+        const sub = document.createElement("p");
+        sub.style.fontFamily = "var(--font-serif)";
+        sub.style.fontSize = "15px";
+        sub.style.color = "var(--lavender-deep)";
+        sub.style.margin = "0 0 10px";
+        sub.textContent = s.garn;
+
+        const qrWrap = document.createElement("div");
+        qrWrap.className = "qr-card__qr";
+        const qrImg = document.createElement("img");
+        qrImg.src = "/api/qr?text=" + encodeURIComponent(url) + "&size=280";
+        qrImg.alt = "QR Station " + s.nr;
+        qrImg.style.width = "240px";
+        qrImg.style.height = "240px";
+        qrImg.style.display = "block";
+        qrWrap.appendChild(qrImg);
+
+        const urlLine = document.createElement("p");
+        urlLine.className = "qr-card__url";
+        urlLine.textContent = url;
+
+        card.appendChild(title);
+        card.appendChild(sub);
+        card.appendChild(qrWrap);
+        card.appendChild(urlLine);
+        qrGrid.appendChild(card);
+
+      }
+
+      qrDateLine.textContent = "Stricktreff am " + new Date(datum).toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+      qrOutput.hidden = false;
+      printBtn.hidden = false;
+      qrOutput.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      showStatus("QR-Codes konnten nicht erstellt werden: " + (err.message || err), "error");
+    }
+  });
+
+  printBtn.addEventListener("click", () => window.print());
+
+  loadOptions();
+})();
+</script>
+</body>
+</html>
